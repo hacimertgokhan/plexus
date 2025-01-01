@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "tailwindcss";
 import autoprefixer from "autoprefixer";
-import * as path from "node:path";
+import path from "path";
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -16,10 +16,17 @@ export default defineConfig(async () => ({
     },
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, 'src')
+            '@': path.resolve(__dirname, 'src'),
+            '@tauri-apps/api': path.resolve('./node_modules/@tauri-apps/api'),
         }
     },
+    build: {
+        target: 'esnext',
+    },
     server: {
+        fs: {
+            allow: [".."]
+        },
         port: 1420,
         strictPort: true,
         host: host || false,

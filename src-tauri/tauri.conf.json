@@ -12,9 +12,9 @@
   "app": {
     "windows": [
       {
-        "title": "plexus",
-        "width": 800,
-        "height": 600
+        "title": "Plexus",
+        "width": 1280,
+        "height": 720
       }
     ],
     "security": {
@@ -25,11 +25,8 @@
     "active": true,
     "targets": "all",
     "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
+      "icons/plexus.png",
+      "icons/plexus.ico"
     ]
   }
 }

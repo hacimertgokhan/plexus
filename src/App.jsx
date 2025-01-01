@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Copy, Play, Terminal as TerminalIcon, X, Save } from "lucide-react";
-import { Terminal } from 'xterm';
-import { FitAddon } from 'xterm-addon-fit';
-import { WebLinksAddon } from 'xterm-addon-web-links';
 import 'xterm/css/xterm.css';
 import {
     Select,
@@ -24,7 +20,10 @@ import {
     MenubarSubTrigger,
     MenubarTrigger,
 } from "@/components/ui/menubar";
-import Editor from '@monaco-editor/react';  // Monaco Editor eklendi
+import Editor from '@monaco-editor/react';
+import {writeTextFile} from "@tauri-apps/plugin-fs";
+import {open, save} from "@tauri-apps/plugin-dialog";
+import {Save, X} from "lucide-react";
 
 const languageExtensions = {
     'javascript': 'js',
@@ -40,22 +39,40 @@ const languageExtensions = {
 
 const IDE = () => {
     const [tabs, setTabs] = useState([
-        { id: 1, name: 'untitled-1.js', content: '// Welcome to Plexus IDE\n', language: 'javascript' }
+        { id: 1, name: 'untitled-1.js', content: '// Welcome to Plexus IDE\n', language: 'javascript', filePath: null }
     ]);
     const [activeTab, setActiveTab] = useState(1);
     const [nextTabId, setNextTabId] = useState(2);
     const [showTerminal, setShowTerminal] = useState(false);
-    const [terminalHeight, setTerminalHeight] = useState(200);
-    const [isDragging, setIsDragging] = useState(false);
-    const [terminal, setTerminal] = useState(null);
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
 
-    const saveFile = useCallback((tabId) => {
-        setTabs(tabs.map(tab =>
-            tab.id === tabId ? { ...tab, saved: true } : tab
-        ));
-        console.log('File saved:', tabs.find(tab => tab.id === tabId)?.name);
+    const saveFileToDisk = useCallback(async (tabId) => {
+        const tab = tabs.find(tab => tab.id === tabId);
+        if (!tab) return;
+        try {
+            let filePath;
+            if (tab.filePath) {
+                filePath = tab.filePath;
+            } else {
+                filePath = await save({
+                    title: "Save File",
+                    filters: [{ name: tab.language, extensions: [languageExtensions[tab.language]] }]
+                });
+            }
+            if (filePath) {
+                await writeTextFile(filePath, tab.content);
+                setTabs(tabs.map(t =>
+                    t.id === tabId
+                        ? { ...t, filePath, saved: true, name: `${filePath.split('/').pop()}` }
+                        : t
+                ));
+                console.log(`File saved at: ${filePath}`);
+            }
+        } catch (error) {
+            console.error("Failed to save file:", error);
+        }
     }, [tabs]);
+
 
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -63,91 +80,14 @@ const IDE = () => {
                 switch (e.key) {
                     case 's':
                         e.preventDefault();
-                        saveFile(activeTab);
-                        break;
-                    case 'j':
-                        e.preventDefault();
-                        setShowTerminal(prev => !prev);
+                        saveFileToDisk(activeTab);
                         break;
                 }
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activeTab, saveFile]);
-
-    useEffect(() => {
-        if (showTerminal && !terminal) {
-            const term = new Terminal({
-                cursorBlink: true,
-                fontSize: 14,
-                fontFamily: 'monospace',
-            });
-            const fitAddon = new FitAddon();
-            const webLinksAddon = new WebLinksAddon();
-
-            term.loadAddon(fitAddon);
-            term.loadAddon(webLinksAddon);
-
-            const terminalElement = document.getElementById('terminal');
-            if (terminalElement) {
-                term.open(terminalElement);
-                fitAddon.fit();
-
-                let commandBuffer = '';
-                term.write('Plexus\r\n# ');
-                term.onKey(({ key, domEvent }) => {
-                    const char = key;
-
-                    if (domEvent.keyCode === 13) { // Enter
-                        term.write('\r\n');
-                        executeCommand(commandBuffer, term);
-                        commandBuffer = '';
-                        term.write('# ');
-                    } else if (domEvent.keyCode === 8) { // Backspace
-                        if (commandBuffer.length > 0) {
-                            commandBuffer = commandBuffer.slice(0, -1);
-                            term.write('\b \b');
-                        }
-                    } else {
-                        commandBuffer += char;
-                        term.write(char);
-                    }
-                });
-
-                setTerminal(term);
-            }
-        }
-    }, [showTerminal]);
-
-    const executeCommand = async (command, term) => {
-        switch (command.trim()) {
-            case 'node -v':
-                term.write('v18.17.0\r\n');
-                break;
-            case 'npm -v':
-                term.write('9.6.7\r\n');
-                break;
-            case 'clear':
-                term.clear();
-                break;
-            default:
-                term.write(`Command not found: ${command}\r\n`);
-        }
-    };
-
-    useEffect(() => {
-        if (autoSaveEnabled) {
-            const autoSaveInterval = setInterval(() => {
-                const currentTab = tabs.find(tab => tab.id === activeTab);
-                if (currentTab && !currentTab.saved) {
-                    saveFile(activeTab);
-                }
-            }, 30000);
-
-            return () => clearInterval(autoSaveInterval);
-        }
-    }, [autoSaveEnabled, activeTab, tabs, saveFile]);
+    }, [activeTab, saveFileToDisk]);
 
     const createNewTab = (language = 'javascript') => {
         const ext = languageExtensions[language];
@@ -155,7 +95,8 @@ const IDE = () => {
             id: nextTabId,
             name: `untitled-${nextTabId}.${ext}`,
             content: `// New ${language} file\n`,
-            language
+            language,
+            filePath: null
         };
         setTabs([...tabs, newTab]);
         setActiveTab(nextTabId);
@@ -214,7 +155,7 @@ const IDE = () => {
                                             </MenubarSubContent>
                                         </MenubarSub>
                                         <MenubarSeparator/>
-                                        <MenubarItem onClick={() => saveFile(activeTab)}>
+                                        <MenubarItem onClick={() => saveFileToDisk(activeTab)}>
                                             Save <MenubarShortcut>⌘S</MenubarShortcut>
                                         </MenubarItem>
                                         <MenubarItem onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}>
@@ -243,7 +184,7 @@ const IDE = () => {
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => saveFile(activeTab)}
+                                onClick={() => saveFileToDisk(activeTab)}
                                 className="text-foreground hover:bg-background"
                             >
                                 <Save className="w-4 h-4"/>
