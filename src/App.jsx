@@ -46,6 +46,7 @@ const IDE = () => {
     const [nextTabId, setNextTabId] = useState(2);
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
     const [currentFolder, setCurrentFolder] = useState(null);
+    const [folderSection, setFolderSection] = useState(true);
 
 
     const saveFileToDisk = useCallback(async (tabId) => {
@@ -259,9 +260,14 @@ const IDE = () => {
                                     <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1">
                                         <SettingsIcon size={14}/> Settings</MenubarTrigger>
                                     <MenubarContent>
-                                        <MenubarItem>
-                                            Layout <MenubarShortcut>⌘ + ALT + L</MenubarShortcut>
-                                        </MenubarItem>
+                                        <MenubarSub>
+                                            <MenubarSubTrigger>Layout</MenubarSubTrigger>
+                                            <MenubarSubContent>
+                                                <MenubarItem onClick={() => setFolderSection(!folderSection)}>
+                                                    Project Folder
+                                                </MenubarItem>
+                                            </MenubarSubContent>
+                                        </MenubarSub>
                                     </MenubarContent>
                                 </MenubarMenu>
                             </Menubar>
@@ -286,7 +292,7 @@ const IDE = () => {
                     </div>
 
                     <div className={"flex w-full flex-row gap-2"}>
-                        <div className="w-[15%] h-screen p-2 overflow-auto">
+                        <div className={`h-screen p-2 overflow-auto`}>
                             <FileExplorer
                                 LoadTabs={createNewTabWithSpecifiedFile}
                                 currentFolder={currentFolder}
@@ -310,17 +316,16 @@ const IDE = () => {
                                 snippetSuggestions: 'top',
                             }}
                         />
-                        {activeTab}
                     </div>
 
-                    <div className="flex flex-row fixed border-[1px] bottom-0 p-1 bg-background w-full h-fit items-start">
+                    <div className="flex flex-row fixed bottom-0 p-1 bg-background w-full h-fit items-start">
                         {tabs.map(tab => (
                             <div
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`px-1 text-sm bg-transparent border-[1px] rounded-md cursor-pointer items-center justify-center flex flex-row ${activeTab === tab.id ? 'bg-accent' : ''}`}
                             >
-                                <p className={`overflow-hidden text-ellipsis w-[100px]`}>{tab.name}<sup>#{tab.id}</sup></p>
+                                <p className={`overflow-hidden text-ellipsis w-[100px]`}>{tab.name}</p>
                                 <button
                                     onClick={(e) => closeTab(tab.id, e)}
                                     className="text-foreground p-2 rounded-xl hover:bg-background ml-2"

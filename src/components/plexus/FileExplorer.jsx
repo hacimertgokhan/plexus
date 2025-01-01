@@ -1,6 +1,6 @@
 import {ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger} from "@/components/ui/context-menu";
 import {FileIcon, FolderIcon} from "lucide-react";
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { writeTextFile, readTextFile, readDir, create, remove } from "@tauri-apps/plugin-fs";
 import {Button} from "@/components/ui/button";
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog";
@@ -16,6 +16,7 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
     const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
     const [newItemName, setNewItemName] = useState('');
     const [selectedPath, setSelectedPath] = useState('');
+    const [folderContents, setFolderContents] = useState({});
 
     useEffect(() => {
         if (currentFolder) {
@@ -26,7 +27,7 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
     const deleteFile = async (path) => {
         try {
             await remove(path);
-            await loadFolder(currentPath); // Refresh the file list
+            await loadFolder(currentPath);
         } catch (error) {
             console.error("Failed to delete file:", error);
         }
@@ -94,57 +95,55 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
 
     const loadFolder = async (_path) => {
         try {
-            const entries = await readDir(_path); // readDir fonksiyonu burada dosya ve klasörleri alacak
+            const entries = await readDir(_path);
             const data = await Promise.all(entries.map(async (entry) => {
-                const entryPath = pathModule.join(_path, entry.name); // Dosyanın tam yolu
-                const resolvedPath = await entryPath; // Eğer entryPath bir Promise döndürüyorsa burada çözülmesini sağlıyoruz
+                const entryPath = await pathModule.join(_path, entry.name);
 
                 const entryData = {
-                    path: resolvedPath, // Dosyanın tam yolu
-                    name: entry.name, // Dosyanın adı
-                    language: entry.name.split('.').pop() // Dosya uzantısı (language) alınıyor
+                    path: entryPath,
+                    name: entry.name,
+                    language: entry.name.split('.').pop()
                 };
 
-                if (entry.isDirectory) { // isDirectory fonksiyonu olmalı
-                    // Klasörse, content olarak alt klasörler ve dosyalar ekle
-                    entryData.type = 'folder'; // Klasör türü
-                    entryData.content = []; // Klasörün içeriği başlangıçta boş
+                if (entry.isDirectory) {
+                    entryData.type = 'folder';
+                    entryData.content = [];
                 } else {
-                    // Dosya ise, content olarak dosyanın içeriğini (şu anda boş bırakıyoruz)
-                    entryData.type = 'file'; // Dosya türü
-                    entryData.content = null; // İçeriği şu anda yok
+                    entryData.type = 'file';
+                    entryData.content = null;
                 }
 
                 return entryData;
             }));
 
-            // Klasör ve dosyaları ayırabilirsin
             const folders = data.filter(entry => entry.type === 'folder');
             const files = data.filter(entry => entry.type === 'file');
 
-            // Klasörler ve dosyalarla güncelle
-            setTree({ files, folders });
+            setFolderContents(prev => ({
+                ...prev,
+                [_path]: { files, folders }
+            }));
+
+            if (_path === currentFolder) {
+                setTree({ files, folders });
+            }
+
             setCurrentPath(_path);
-            console.log(files, folders); // Debug için dosya ve klasörleri kontrol et
+            return { files, folders };
         } catch (error) {
             console.error("Failed to load folder:", error);
+            return { files: [], folders: [] };
         }
     };
 
-
-
-    const handleContextMenu = async (e, type, path) => {
-        e.preventDefault();
-        e.stopPropagation();
-    };
-
-    const toggleFolder = (path) => {
+    const toggleFolder = async (path) => {
         setExpandedFolders(prev => {
             const next = new Set(prev);
             if (next.has(path)) {
                 next.delete(path);
             } else {
                 next.add(path);
+                loadFolder(path);
             }
             return next;
         });
@@ -152,7 +151,7 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
 
     const renderTree = (items) => (
         <div className="pl-1">
-            {items.folders.map(folder => (
+            {items?.folders?.map(folder => (
                 <div key={folder.path}>
                     <ContextMenu>
                         <ContextMenuTrigger>
@@ -170,12 +169,12 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
                             <ContextMenuItem onClick={() => deleteFolder(folder.path)}>Delete</ContextMenuItem>
                         </ContextMenuContent>
                     </ContextMenu>
-                    {expandedFolders.has(folder.path) && (
-                        loadFolder(folder.path).then(subEntries => renderTree(subEntries))
+                    {expandedFolders.has(folder.path) && folderContents[folder.path] && (
+                        renderTree(folderContents[folder.path])
                     )}
                 </div>
             ))}
-            {items.files.map(file => (
+            {items?.files?.map(file => (
                 <ContextMenu key={file.path}>
                     <ContextMenuTrigger>
                         <div
@@ -190,7 +189,7 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
                         </div>
                     </ContextMenuTrigger>
                     <ContextMenuContent>
-                        <ContextMenuItem onClick={() => deleteFile(file.path)}>{JSON.stringify(file)}</ContextMenuItem>
+                        <ContextMenuItem onClick={() => deleteFile(file.path)}>Delete</ContextMenuItem>
                         <ContextMenuItem onClick={() => renameFile(file.path)}>Rename</ContextMenuItem>
                     </ContextMenuContent>
                 </ContextMenu>
