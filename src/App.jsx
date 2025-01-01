@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import 'xterm/css/xterm.css';
 import {
     Select,
@@ -23,9 +22,9 @@ import {
 import Editor from '@monaco-editor/react';
 import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import {FileIcon, Package2Icon, Save, X} from "lucide-react";
-import { Terminal } from 'xterm';
+import {FileIcon, Package2Icon, Save, SettingsIcon, X} from "lucide-react";
 import {invoke} from "@tauri-apps/api/core";
+import FileExplorer from "@/components/plexus/FileExplorer.jsx";
 
 const languageExtensions = {
     'javascript': 'js',
@@ -46,17 +45,8 @@ const IDE = () => {
     const [activeTab, setActiveTab] = useState(1);
     const [nextTabId, setNextTabId] = useState(2);
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+    const [currentFolder, setCurrentFolder] = useState(null);
 
-    const [terminalOutput, setTerminalOutput] = useState("");
-    const terminalRef = useRef(null); // Create a reference to the terminal
-
-    useEffect(() => {
-        if (terminalRef.current) {
-            const term = new Terminal();
-            term.open(terminalRef.current);  // Attach terminal to the ref container
-            term.writeln('Welcome to Plexus IDE terminal');
-        }
-    }, []);
 
     const saveFileToDisk = useCallback(async (tabId) => {
         const tab = tabs.find(tab => tab.id === tabId);
@@ -124,6 +114,20 @@ const IDE = () => {
         setNextTabId(nextTabId + 1);
     };
 
+    const createNewTabWithSpecifiedFile = async (name, content, path, language = 'javascript') => {
+        const fileContent = await readTextFile(path);
+        const newTab = {
+            id: nextTabId,
+            name: name,
+            content: fileContent,
+            language,
+            filePath: path,
+        };
+        setTabs([...tabs, newTab]);
+        setActiveTab(nextTabId);
+        setNextTabId(nextTabId + 1);
+    };
+
     const closeTab = (tabId, e) => {
         e.stopPropagation();
         if (tabs.length === 1) return;
@@ -157,25 +161,63 @@ const IDE = () => {
     const createFrameworkProject = useCallback(async (framework) => {
         try {
             const result = await invoke("create_project_command", { framework });
-            setTerminalOutput(result);
         } catch (error) {
-            setTerminalOutput(`Error: ${error.message}`);
         }
     }, []);
+
+
+    const openFolder = useCallback(async () => {
+        try {
+            const folderPath = await open({
+                directory: true
+            });
+            if (folderPath) {
+                setCurrentFolder(folderPath);
+            }
+        } catch (error) {
+            console.error("Failed to open folder:", error);
+        }
+    }, []);
+
+    const handleFileSelect = async (filePath, lang) => {
+        try {
+            const fileContent = await readTextFile(filePath);
+            const newTab = {
+                id: nextTabId,
+                name: filePath.split('/').pop(),
+                content: fileContent,
+                language: lang,
+                filePath
+            };
+
+            // Yeni sekme ekleniyor ve aktif sekme olarak ayarlanıyor
+            setTabs([...tabs, newTab]);
+            setActiveTab(nextTabId);
+            setNextTabId(nextTabId + 1);
+        } catch (error) {
+            console.error("Failed to open file:", error);
+        }
+    };
+
+
 
     return (
         <div className="w-screen h-screen">
             <Card className="bg-background w-full h-full border-none">
                 <div className="flex flex-col h-full">
-                    <div className="flex items-center border-none justify-between px-4 py-2">
+                    <div className="flex border-[1px] items-center justify-between px-4 py-2">
                         <div className="flex items-center -ml-3 h-[30px] flex-row justify-start">
                             <Menubar className="shadow-none border-none">
                                 <MenubarMenu>
-                                    <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1"><FileIcon size={14}/> File</MenubarTrigger>
+                                    <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1"><FileIcon
+                                        size={14}/> File</MenubarTrigger>
                                     <MenubarContent>
                                         <MenubarSub>
                                             <MenubarItem onClick={openFile}>
                                                 Open File <MenubarShortcut>⌘+Alt+A</MenubarShortcut>
+                                            </MenubarItem>
+                                            <MenubarItem onClick={openFolder}>
+                                                Open Folder <MenubarShortcut>⌘+K</MenubarShortcut>
                                             </MenubarItem>
                                             <MenubarSubTrigger>New File</MenubarSubTrigger>
                                             <MenubarSubContent>
@@ -196,7 +238,8 @@ const IDE = () => {
                                     </MenubarContent>
                                 </MenubarMenu>
                                 <MenubarMenu>
-                                    <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1"><Package2Icon size={14}/> Projects</MenubarTrigger>
+                                    <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1"><Package2Icon
+                                        size={14}/> Projects</MenubarTrigger>
                                     <MenubarContent>
                                         <MenubarSub>
                                             <MenubarSubTrigger>New Web Project</MenubarSubTrigger>
@@ -209,6 +252,16 @@ const IDE = () => {
                                                     onClick={() => createFrameworkProject('Angular')}>Angular</MenubarItem>
                                             </MenubarSubContent>
                                         </MenubarSub>
+                                    </MenubarContent>
+                                </MenubarMenu>
+
+                                <MenubarMenu>
+                                    <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1">
+                                        <SettingsIcon size={14}/> Settings</MenubarTrigger>
+                                    <MenubarContent>
+                                        <MenubarItem>
+                                            Layout <MenubarShortcut>⌘ + ALT + L</MenubarShortcut>
+                                        </MenubarItem>
                                     </MenubarContent>
                                 </MenubarMenu>
                             </Menubar>
@@ -232,14 +285,42 @@ const IDE = () => {
                         </div>
                     </div>
 
-                    <div className="flex flex-row h-fit border-none items-start">
+                    <div className={"flex w-full flex-row gap-2"}>
+                        <div className="w-[15%] h-screen p-2 overflow-auto">
+                            <FileExplorer
+                                LoadTabs={createNewTabWithSpecifiedFile}
+                                currentFolder={currentFolder}
+                                onFileSelect={handleFileSelect}
+                                setActiveTab={setActiveTab} // Add this line to pass the setActiveTab function
+                            />
+                        </div>
+                        <Editor
+                            className={"w-[85%]"}
+                            language={tabs.find(tab => tab.id === activeTab)?.language}
+                            value={tabs.find(tab => tab.id === activeTab)?.content}
+                            onChange={updateTabContent}
+                            theme={"vs-dark"}
+                            options={{
+                                autoClosingQuotes: "languageDefined",
+                                autoSurround: "languageDefined",
+                                lineNumbers: "on",
+                                automaticLayout: true,
+                                wordWrap: 'on',
+                                suggestOnTriggerCharacters: true,
+                                snippetSuggestions: 'top',
+                            }}
+                        />
+                        {activeTab}
+                    </div>
+
+                    <div className="flex flex-row fixed border-[1px] bottom-0 p-1 bg-background w-full h-fit items-start">
                         {tabs.map(tab => (
                             <div
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`px-1 border-l-transparent text-sm bg-transparent border-foreground border-[1px] rounded-md cursor-pointer items-center justify-center flex flex-row ${activeTab === tab.id ? 'bg-accent' : ''}`}
+                                className={`px-1 text-sm bg-transparent border-[1px] rounded-md cursor-pointer items-center justify-center flex flex-row ${activeTab === tab.id ? 'bg-accent' : ''}`}
                             >
-                                <p className={`overflow-hidden text-ellipsis w-[100px]`}>{tab.name}</p>
+                                <p className={`overflow-hidden text-ellipsis w-[100px]`}>{tab.name}<sup>#{tab.id}</sup></p>
                                 <button
                                     onClick={(e) => closeTab(tab.id, e)}
                                     className="text-foreground p-2 rounded-xl hover:bg-background ml-2"
@@ -250,26 +331,6 @@ const IDE = () => {
                         ))}
                     </div>
 
-                    <Editor
-                        language={tabs.find(tab => tab.id === activeTab)?.language}
-                        value={tabs.find(tab => tab.id === activeTab)?.content}
-                        onChange={updateTabContent}
-                        theme={"vs-dark"}
-                        options={{
-                            autoClosingQuotes: "languageDefined",
-                            autoSurround: "languageDefined",
-                            lineNumbers: "on",
-                            automaticLayout: true,
-                            wordWrap: 'on',
-                            suggestOnTriggerCharacters: true,
-                            snippetSuggestions: 'top',
-                        }}
-                    />
-
-                    <div
-                        ref={terminalRef} // Attach to the terminal container
-                        className="w-full h-64 bg-black/15 p-4 overflow-auto"
-                    ></div>
                 </div>
             </Card>
         </div>
