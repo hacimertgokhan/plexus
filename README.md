@@ -4,6 +4,7 @@
 ![plexus.png](src-tauri/icons/plexus.png)
 
 </div>
+
 # Plexus IDE
 
 Plexus IDE is a modern, feature-rich code editor designed to provide a seamless coding experience for developers. With support for multiple programming languages, tabs for easy navigation, and built-in file management, Plexus IDE is built for both beginners and professionals alike.
