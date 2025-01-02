@@ -27,23 +27,9 @@ import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-python';
 import 'prismjs/themes/prism-tomorrow.css';
+import {SUGGESTIONS} from "@/lib/suggestions.js";
 
-const SUGGESTIONS = {
-    'func': ['function', 'const functionName = () => {}'],
-    'if': ['if (condition) {}', 'if (condition) {} else {}'],
-    'for': ['for (let i = 0; i < length; i++) {}', 'for (const item of items) {}'],
-    'while': ['while (condition) {}'],
-    'class': ['class ClassName {}', 'class ClassName extends ParentClass {}']
-};
 
-const BRACKETS_MAP = {
-    '{': '}',
-    '[': ']',
-    '(': ')',
-    '"': '"',
-    "'": "'",
-    '`': '`'
-};
 
 const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
     const editorRef = useRef(null);
@@ -72,7 +58,8 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
         const words = currentLine.trim().split(/\s+/);
         const lastWord = words[words.length - 1];
 
-        if (SUGGESTIONS[lastWord]) {
+        const suggestionsForLanguage = SUGGESTIONS[language.toLowerCase()] || {};
+        if (suggestionsForLanguage[lastWord]) {
             const rect = editorRef.current.getBoundingClientRect();
             const lineHeight = 24;
 
@@ -80,12 +67,12 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
                 top: (currentLineIndex + 1) * lineHeight,
                 left: currentLine.length * 8
             });
-            setSuggestions(SUGGESTIONS[lastWord]);
+            setSuggestions(suggestionsForLanguage[lastWord]);
             setShowSuggestions(true);
         } else {
             setShowSuggestions(false);
         }
-    }, [onChange]);
+    }, [onChange, language]);
 
     const handleKeyPress = useCallback((e) => {
         const openingBracket = e.key;
