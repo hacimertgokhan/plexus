@@ -17,6 +17,9 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
     const [newItemName, setNewItemName] = useState('');
     const [selectedPath, setSelectedPath] = useState('');
     const [folderContents, setFolderContents] = useState({});
+    const [searchQuery, setSearchQuery] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
     useEffect(() => {
         if (currentFolder) {
@@ -30,6 +33,7 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
             await loadFolder(currentPath);
         } catch (error) {
             console.error("Failed to delete file:", error);
+            setError('Failed to delete file');
         }
     };
 
@@ -39,6 +43,7 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
             await loadFolder(currentPath);
         } catch (error) {
             console.error("Failed to delete folder:", error);
+            setError('Failed to delete folder');
         }
     };
 
@@ -54,25 +59,27 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
 
     const handleCreateFile = async () => {
         try {
-            const newPath = `${selectedPath}/${newItemName}`;
+            const newPath = await pathModule.join(selectedPath, newItemName);
             await writeTextFile(newPath, '');
             setIsNewFileDialogOpen(false);
             setNewItemName('');
             await loadFolder(currentPath);
         } catch (error) {
             console.error("Failed to create file:", error);
+            setError('Failed to create file');
         }
     };
 
     const handleCreateFolder = async () => {
         try {
-            const newPath = `${selectedPath}/${newItemName}`;
+            const newPath = await pathModule.join(selectedPath, newItemName);
             await create(newPath);
             setIsNewFolderDialogOpen(false);
             setNewItemName('');
             await loadFolder(currentPath);
         } catch (error) {
             console.error("Failed to create folder:", error);
+            setError('Failed to create folder');
         }
     };
 
@@ -84,16 +91,19 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
 
     const handleRename = async () => {
         try {
-            const newPath = `${selectedPath.substring(0, selectedPath.lastIndexOf('/'))}/${newItemName}`;
+            const newPath = await pathModule.join(selectedPath.substring(0, selectedPath.lastIndexOf('/')), newItemName);
+            // Rename logic here
             setIsRenameDialogOpen(false);
             setNewItemName('');
             await loadFolder(currentPath);
         } catch (error) {
             console.error("Failed to rename file:", error);
+            setError('Failed to rename file');
         }
     };
 
     const loadFolder = async (_path) => {
+        setLoading(true);
         try {
             const entries = await readDir(_path);
             const data = await Promise.all(entries.map(async (entry) => {
@@ -129,9 +139,12 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
             }
 
             setCurrentPath(_path);
+            setLoading(false);
             return { files, folders };
         } catch (error) {
             console.error("Failed to load folder:", error);
+            setError(`Failed to load folder: ${_path}`);
+            setLoading(false);
             return { files: [], folders: [] };
         }
     };
@@ -197,10 +210,32 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
         </div>
     );
 
+    const filteredTree = (tree, searchQuery) => {
+        const { files, folders } = tree;
+        const filteredFolders = folders.filter(folder => folder.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        const filteredFiles = files.filter(file => file.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        return { files: filteredFiles, folders: filteredFolders };
+    };
+
     return (
         <>
-            <div className="w-full border-l border-border h-full overflow-y-auto">
-                {renderTree(tree)}
+            <div className="flex flex-col w-full h-full">
+                <div className="flex items-center p-2">
+                    <Input
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search..."
+                    />
+                </div>
+                <div className="w-full border-l border-border h-full overflow-y-auto">
+                    {loading ? (
+                        <div>Loading...</div>
+                    ) : error ? (
+                        <div className="text-red-500">{error}</div>
+                    ) : (
+                        renderTree(filteredTree(tree, searchQuery))
+                    )}
+                </div>
             </div>
 
             <Dialog open={isNewFileDialogOpen} onOpenChange={setIsNewFileDialogOpen}>

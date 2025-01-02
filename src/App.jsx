@@ -1,6 +1,5 @@
-import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Card } from "@/components/ui/card";
-import 'xterm/css/xterm.css';
 import {
     Select,
     SelectContent,
@@ -21,11 +20,103 @@ import {
 } from "@/components/ui/menubar";
 import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { FileIcon, Package2Icon, Save, SettingsIcon, X } from "lucide-react";
+import { FileIcon, Package2Icon, Code2Icon, SettingsIcon, X } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import FileExplorer from "@/components/plexus/FileExplorer.jsx";
-import CodeEditor from "@/components/plexus/PlexusEditor.jsx";
-import debounce from "lodash/debounce";
+import Prism from 'prismjs';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-python';
+import 'prismjs/themes/prism-tomorrow.css';
+
+const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
+    const editorRef = useRef(null);
+    const [localValue, setLocalValue] = useState(value);
+
+    const handleChange = useCallback((e) => {
+        const newValue = e.target.value;
+        setLocalValue(newValue);
+        onChange(newValue);
+    }, [onChange]);
+
+    const highlightedCode = useMemo(() => {
+        try {
+            return Prism.highlight(
+                localValue || '',
+                Prism.languages[language] || Prism.languages.javascript,
+                language
+            );
+        } catch (error) {
+            console.error('Highlighting error:', error);
+            return localValue || '';
+        }
+    }, [localValue, language]);
+
+    const lineNumbers = useMemo(() => {
+        const lines = (localValue || '').split('\n').length;
+        return Array.from({ length: lines }, (_, i) => i + 1);
+    }, [localValue]);
+
+    const handleKeyDown = useCallback((e) => {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = e.target.selectionStart;
+            const end = e.target.selectionEnd;
+            const newValue = localValue.substring(0, start) + '    ' + localValue.substring(end);
+            setLocalValue(newValue);
+            onChange(newValue);
+
+            requestAnimationFrame(() => {
+                e.target.selectionStart = e.target.selectionEnd = start + 4;
+            });
+        } else if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            if (onSave) onSave();
+        }
+    }, [localValue, onChange, onSave]);
+
+    useEffect(() => {
+        if (value !== localValue) {
+            setLocalValue(value);
+        }
+    }, [value, localValue]);
+
+    return (
+        <div className="w-full h-full rounded-lg overflow-hidden border relative font-mono">
+            <div className="w-full h-full flex">
+                <div className="p-4 text-right text-gray-500 select-none bg-opacity-50 w-[50px]">
+                    {lineNumbers.map((num) => (
+                        <div key={num} className="leading-6">
+                            {num}
+                        </div>
+                    ))}
+                </div>
+
+                <div className="relative flex-grow overflow-auto">
+                    <textarea
+                        ref={editorRef}
+                        value={localValue}
+                        onChange={handleChange}
+                        onKeyDown={handleKeyDown}
+                        className="absolute top-0 left-0 w-full h-full p-4 font-mono text-transparent caret-white bg-transparent resize-none outline-none z-10"
+                        spellCheck="false"
+                        autoCapitalize="off"
+                        autoComplete="off"
+                        autoCorrect="off"
+                    />
+
+                    <pre className="w-full h-full p-4 m-0 overflow-hidden whitespace-pre-wrap break-words">
+                        <code
+                            className={`language-${language}`}
+                            dangerouslySetInnerHTML={{ __html: highlightedCode }}
+                        />
+                    </pre>
+                </div>
+            </div>
+        </div>
+    );
+});
+
+CodeEditor.displayName = 'CodeEditor';
 
 const languageExtensions = {
     'javascript': 'js',
@@ -60,16 +151,13 @@ const IDE = () => {
         const tabId = activeTab;
         tabContentRef.current[tabId] = content;
 
-        // Performans için setState'i throttle ediyoruz
-        debounce(() => {
-            setTabs(prevTabs =>
-                prevTabs.map(tab =>
-                    tab.id === tabId
-                        ? { ...tab, content: tabContentRef.current[tabId] }
-                        : tab
-                )
-            );
-        }, 100)();
+        setTabs(prevTabs =>
+            prevTabs.map(tab =>
+                tab.id === tabId
+                    ? { ...tab, content: tabContentRef.current[tabId] }
+                    : tab
+            )
+        );
     }, [activeTab]);
 
     const closeTab = useCallback((tabId, e) => {
@@ -91,7 +179,6 @@ const IDE = () => {
         []
     );
 
-// Dosya kaydetme işlemini optimize ediyoruz
     const saveFileToDisk = useCallback(async (tabId) => {
         const tab = tabs.find(tab => tab.id === tabId);
         if (!tab) return;
@@ -246,6 +333,17 @@ const IDE = () => {
         }
     };
 
+    const handleSave = useCallback(() => {
+        const currentTab = tabs.find(tab => tab.id === activeTab);
+        if (currentTab) {
+            if (currentTab.filePath) {
+                saveFileToDisk(activeTab);
+            } else {
+                saveFileToDisk(activeTab);
+            }
+        }
+    }, [activeTab, tabs, saveFileToDisk]);
+
     return (
         <div className="w-screen h-screen">
             <Card className="bg-background w-full h-full border-none">
@@ -274,7 +372,7 @@ const IDE = () => {
                                             </MenubarSubContent>
                                         </MenubarSub>
                                         <MenubarSeparator/>
-                                        <MenubarItem onClick={() => saveFileToDisk(activeTab)}>
+                                        <MenubarItem onClick={() => handleSave()}>
                                             Save <MenubarShortcut>⌘S</MenubarShortcut>
                                         </MenubarItem>
                                         <MenubarItem onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}>
@@ -289,12 +387,23 @@ const IDE = () => {
                                         <MenubarSub>
                                             <MenubarSubTrigger>New Web Project</MenubarSubTrigger>
                                             <MenubarSubContent>
-                                                <MenubarItem
-                                                    onClick={() => createFrameworkProject('Next')}>Next</MenubarItem>
+                                                <MenubarItem onClick={() => createFrameworkProject('HTML')}>HTML</MenubarItem>
+                                                <MenubarItem onClick={() => createFrameworkProject('Next')}>Next</MenubarItem>
                                                 <MenubarItem
                                                     onClick={() => createFrameworkProject('React')}>React</MenubarItem>
                                                 <MenubarItem
                                                     onClick={() => createFrameworkProject('Angular')}>Angular</MenubarItem>
+                                            </MenubarSubContent>
+                                        </MenubarSub>
+                                        <MenubarSub>
+                                            <MenubarSubTrigger>New App Project</MenubarSubTrigger>
+                                            <MenubarSubContent>
+                                                <MenubarItem
+                                                    onClick={() => createFrameworkProject('Tauri')}>Tauri</MenubarItem>
+                                                <MenubarItem
+                                                    onClick={() => createFrameworkProject('Electron')}>Electron</MenubarItem>
+                                                <MenubarItem onClick={() => createFrameworkProject('ReactNative')}>React Native</MenubarItem>
+                                                <MenubarItem onClick={() => createFrameworkProject('Expo')}>Expo</MenubarItem>
                                             </MenubarSubContent>
                                         </MenubarSub>
                                     </MenubarContent>
@@ -304,14 +413,28 @@ const IDE = () => {
                                     <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1">
                                         <SettingsIcon size={14}/> Settings</MenubarTrigger>
                                     <MenubarContent>
-                                        <MenubarSub>
-                                            <MenubarSubTrigger>Layout</MenubarSubTrigger>
-                                            <MenubarSubContent>
-                                                <MenubarItem onClick={() => setFolderSection(!folderSection)}>
-                                                    Project Folder
-                                                </MenubarItem>
-                                            </MenubarSubContent>
-                                        </MenubarSub>
+                                        <MenubarItem>
+                                            Window
+                                        </MenubarItem>
+                                        <MenubarItem>
+                                            Layout
+                                        </MenubarItem>
+                                        <MenubarItem>
+                                            Optimization
+                                        </MenubarItem>
+                                    </MenubarContent>
+                                </MenubarMenu>
+
+                                <MenubarMenu>
+                                    <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1">
+                                        <Code2Icon size={14}/> Plexus</MenubarTrigger>
+                                    <MenubarContent>
+                                        <MenubarItem>
+                                            Repository
+                                        </MenubarItem>
+                                        <MenubarItem>
+                                            Developers
+                                        </MenubarItem>
                                     </MenubarContent>
                                 </MenubarMenu>
                             </Menubar>
@@ -352,6 +475,7 @@ const IDE = () => {
                             language={activeTabData?.language || "javascript"}
                             value={activeTabData?.content || ""}
                             onChange={updateTabContent}
+                            onSave={handleSave}
                         />
                     </div>
 
@@ -373,7 +497,6 @@ const IDE = () => {
         </div>
     );
 };
-
 const Tab = React.memo(({ tab, isActive, onActivate, onClose }) => (
     <div
         onClick={onActivate}
