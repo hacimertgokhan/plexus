@@ -28,15 +28,165 @@ import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-python';
 import 'prismjs/themes/prism-tomorrow.css';
 
+const SUGGESTIONS = {
+    'func': ['function', 'const functionName = () => {}'],
+    'if': ['if (condition) {}', 'if (condition) {} else {}'],
+    'for': ['for (let i = 0; i < length; i++) {}', 'for (const item of items) {}'],
+    'while': ['while (condition) {}'],
+    'class': ['class ClassName {}', 'class ClassName extends ParentClass {}']
+};
+
+const BRACKETS_MAP = {
+    '{': '}',
+    '[': ']',
+    '(': ')',
+    '"': '"',
+    "'": "'",
+    '`': '`'
+};
+
 const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
     const editorRef = useRef(null);
     const [localValue, setLocalValue] = useState(value);
+    const [suggestions, setSuggestions] = useState([]);
+    const [suggestionPosition, setSuggestionPosition] = useState({ top: 0, left: 0 });
+    const [showSuggestions, setShowSuggestions] = useState(false);
 
     const handleChange = useCallback((e) => {
         const newValue = e.target.value;
         setLocalValue(newValue);
         onChange(newValue);
+
+        // Get current line content
+        const lines = newValue.split('\n');
+        const cursorPosition = e.target.selectionStart;
+        let currentLineIndex = 0;
+        let charCount = 0;
+
+        while (charCount + lines[currentLineIndex].length + 1 <= cursorPosition && currentLineIndex < lines.length) {
+            charCount += lines[currentLineIndex].length + 1;
+            currentLineIndex++;
+        }
+
+        const currentLine = lines[currentLineIndex] || '';
+        const words = currentLine.trim().split(/\s+/);
+        const lastWord = words[words.length - 1];
+
+        if (SUGGESTIONS[lastWord]) {
+            const rect = editorRef.current.getBoundingClientRect();
+            const lineHeight = 24;
+
+            setSuggestionPosition({
+                top: (currentLineIndex + 1) * lineHeight,
+                left: currentLine.length * 8
+            });
+            setSuggestions(SUGGESTIONS[lastWord]);
+            setShowSuggestions(true);
+        } else {
+            setShowSuggestions(false);
+        }
     }, [onChange]);
+
+    const handleKeyPress = useCallback((e) => {
+        const openingBracket = e.key;
+        if (BRACKETS_MAP[openingBracket]) {
+            e.preventDefault();
+
+            const cursorPos = editorRef.current.selectionStart;
+            const selectionEnd = editorRef.current.selectionEnd;
+            const hasSelection = cursorPos !== selectionEnd;
+
+            let newValue;
+            if (hasSelection) {
+                // Wrap selection with brackets
+                const selectedText = localValue.substring(cursorPos, selectionEnd);
+                newValue =
+                    localValue.substring(0, cursorPos) +
+                    openingBracket +
+                    selectedText +
+                    BRACKETS_MAP[openingBracket] +
+                    localValue.substring(selectionEnd);
+
+                setLocalValue(newValue);
+                onChange(newValue);
+
+                // Set cursor position after the selection
+                requestAnimationFrame(() => {
+                    editorRef.current.selectionStart = cursorPos;
+                    editorRef.current.selectionEnd = selectionEnd + 2;
+                });
+            } else {
+                // Insert matching bracket and place cursor between them
+                newValue =
+                    localValue.substring(0, cursorPos) +
+                    openingBracket +
+                    BRACKETS_MAP[openingBracket] +
+                    localValue.substring(cursorPos);
+
+                setLocalValue(newValue);
+                onChange(newValue);
+
+                // Place cursor between brackets
+                requestAnimationFrame(() => {
+                    editorRef.current.selectionStart = editorRef.current.selectionEnd = cursorPos + 1;
+                });
+            }
+        }
+    }, [localValue, onChange]);
+
+    const handleSuggestionSelect = useCallback((suggestion) => {
+        const lines = localValue.split('\n');
+        const cursorPosition = editorRef.current.selectionStart;
+        let currentLineIndex = 0;
+        let charCount = 0;
+
+        while (charCount + lines[currentLineIndex].length + 1 <= cursorPosition) {
+            charCount += lines[currentLineIndex].length + 1;
+            currentLineIndex++;
+        }
+
+        const currentLine = lines[currentLineIndex];
+        const words = currentLine.trim().split(/\s+/);
+        const lastWord = words[words.length - 1];
+
+        lines[currentLineIndex] = currentLine.replace(lastWord, suggestion);
+
+        const newValue = lines.join('\n');
+        setLocalValue(newValue);
+        onChange(newValue);
+        setShowSuggestions(false);
+    }, [localValue, onChange]);
+
+    const handleKeyDown = useCallback((e) => {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = e.target.selectionStart;
+            const end = e.target.selectionEnd;
+            const newValue = localValue.substring(0, start) + '    ' + localValue.substring(end);
+            setLocalValue(newValue);
+            onChange(newValue);
+
+            requestAnimationFrame(() => {
+                e.target.selectionStart = e.target.selectionEnd = start + 4;
+            });
+        } else if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            if (onSave) onSave();
+        } else if (showSuggestions && e.key === 'Enter') {
+            e.preventDefault();
+            if (suggestions.length > 0) {
+                handleSuggestionSelect(suggestions[0]);
+            }
+        } else if (showSuggestions && e.key === 'Escape') {
+            setShowSuggestions(false);
+        }
+    }, [localValue, onChange, onSave, showSuggestions, suggestions, handleSuggestionSelect]);
+
+    useEffect(() => {
+        if (value !== localValue) {
+            setLocalValue(value);
+        }
+    }, [value, localValue]);
 
     const highlightedCode = useMemo(() => {
         try {
@@ -56,30 +206,6 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
         return Array.from({ length: lines }, (_, i) => i + 1);
     }, [localValue]);
 
-    const handleKeyDown = useCallback((e) => {
-        if (e.key === 'Tab') {
-            e.preventDefault();
-            const start = e.target.selectionStart;
-            const end = e.target.selectionEnd;
-            const newValue = localValue.substring(0, start) + '    ' + localValue.substring(end);
-            setLocalValue(newValue);
-            onChange(newValue);
-
-            requestAnimationFrame(() => {
-                e.target.selectionStart = e.target.selectionEnd = start + 4;
-            });
-        } else if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            if (onSave) onSave();
-        }
-    }, [localValue, onChange, onSave]);
-
-    useEffect(() => {
-        if (value !== localValue) {
-            setLocalValue(value);
-        }
-    }, [value, localValue]);
-
     const wordCount = useMemo(() => {
         return (localValue.match(/\b\w+\b/g) || []).length;
     }, [localValue]);
@@ -95,7 +221,9 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
     return (
         <div className="w-full h-full rounded-lg overflow-hidden border relative font-mono">
             <div className="p-2 text-sm flex items-center gap-2 w-full border-b">
-                <span className={"ml-2"}>{wordCount}<sup>Words</sup></span> | <span>{charCount}<sup>Characters</sup></span> | <span>{fileSize}<sup>bytes</sup></span>
+                <span className="ml-2">{wordCount}<sup>Words</sup></span> |
+                <span>{charCount}<sup>Characters</sup></span> |
+                <span>{fileSize}<sup>bytes</sup></span>
             </div>
             <div className="w-full h-full flex">
                 <div className="p-4 text-right text-gray-500 select-none bg-opacity-50 w-[50px]">
@@ -112,6 +240,7 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
                         value={localValue}
                         onChange={handleChange}
                         onKeyDown={handleKeyDown}
+                        onKeyPress={handleKeyPress}
                         className="absolute top-0 left-0 w-full h-full p-4 font-mono text-transparent caret-white bg-transparent resize-none outline-none z-10"
                         spellCheck="false"
                         autoCapitalize="off"
@@ -122,15 +251,35 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
                     <pre className="w-full h-full p-4 m-0 overflow-hidden whitespace-pre-wrap break-words">
                         <code
                             className={`language-${language}`}
-                            dangerouslySetInnerHTML={{ __html: highlightedCode }}
+                            dangerouslySetInnerHTML={{__html: highlightedCode}}
                         />
                     </pre>
+
+
+                    {showSuggestions && (
+                        <div
+                            className="absolute z-20 bg-[#101010] border rounded-[6px] shadow-lg"
+                            style={{
+                                top: suggestionPosition.top,
+                                left: suggestionPosition.left
+                            }}
+                        >
+                            {suggestions.map((suggestion, index) => (
+                                <div
+                                    key={index}
+                                    className="px-4 py-2 transition-all hover:text-orange-200 hover:bg-[#202020] cursor-pointer"
+                                    onClick={() => handleSuggestionSelect(suggestion)}
+                                >
+                                    {suggestion}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
     );
 });
-
 
 CodeEditor.displayName = 'CodeEditor';
 
@@ -148,7 +297,7 @@ const languageExtensions = {
 
 const IDE = () => {
     const [tabs, setTabs] = useState([
-        { id: 1, name: 'untitled-1.js', content: '// Welcome to Plexus IDE\n', language: 'javascript', filePath: null }
+        {id: 1, name: 'untitled-1.js', content: '// Welcome to Plexus IDE\n', language: 'javascript', filePath: null}
     ]);
     const [activeTab, setActiveTab] = useState(1);
     const [nextTabId, setNextTabId] = useState(2);
@@ -170,7 +319,7 @@ const IDE = () => {
         setTabs(prevTabs =>
             prevTabs.map(tab =>
                 tab.id === tabId
-                    ? { ...tab, content: tabContentRef.current[tabId] }
+                    ? {...tab, content: tabContentRef.current[tabId]}
                     : tab
             )
         );
