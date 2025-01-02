@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/menubar";
 import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { FileIcon, Package2Icon, Code2Icon, SettingsIcon, X } from "lucide-react";
+import {FileIcon, Package2Icon, Code2Icon, SettingsIcon, X, CopyIcon, FolderOpen, FolderClosed} from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import FileExplorer from "@/components/plexus/FileExplorer.jsx";
 import Prism from 'prismjs';
@@ -28,8 +28,7 @@ import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-python';
 import 'prismjs/themes/prism-tomorrow.css';
 import {SUGGESTIONS} from "@/lib/suggestions.js";
-
-
+import {BRACKETS_MAP} from "@/lib/brackets.js";
 
 const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
     const editorRef = useRef(null);
@@ -43,29 +42,27 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
         setLocalValue(newValue);
         onChange(newValue);
 
-        // Get current line content
         const lines = newValue.split('\n');
         const cursorPosition = e.target.selectionStart;
         let currentLineIndex = 0;
         let charCount = 0;
 
-        while (charCount + lines[currentLineIndex].length + 1 <= cursorPosition && currentLineIndex < lines.length) {
+        while (charCount + lines[currentLineIndex]?.length + 1 <= cursorPosition && currentLineIndex < lines.length) {
             charCount += lines[currentLineIndex].length + 1;
             currentLineIndex++;
         }
 
         const currentLine = lines[currentLineIndex] || '';
-        const words = currentLine.trim().split(/\s+/);
-        const lastWord = words[words.length - 1];
+        const lastWord = currentLine.trim().split(/\s+/).pop();
 
         const suggestionsForLanguage = SUGGESTIONS[language.toLowerCase()] || {};
         if (suggestionsForLanguage[lastWord]) {
-            const rect = editorRef.current.getBoundingClientRect();
+            const rect = editorRef.current?.getBoundingClientRect();
             const lineHeight = 24;
 
             setSuggestionPosition({
                 top: (currentLineIndex + 1) * lineHeight,
-                left: currentLine.length * 8
+                left: currentLine.length * 8,
             });
             setSuggestions(suggestionsForLanguage[lastWord]);
             setShowSuggestions(true);
@@ -85,7 +82,6 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
 
             let newValue;
             if (hasSelection) {
-                // Wrap selection with brackets
                 const selectedText = localValue.substring(cursorPos, selectionEnd);
                 newValue =
                     localValue.substring(0, cursorPos) +
@@ -93,31 +89,20 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
                     selectedText +
                     BRACKETS_MAP[openingBracket] +
                     localValue.substring(selectionEnd);
-
-                setLocalValue(newValue);
-                onChange(newValue);
-
-                // Set cursor position after the selection
-                requestAnimationFrame(() => {
-                    editorRef.current.selectionStart = cursorPos;
-                    editorRef.current.selectionEnd = selectionEnd + 2;
-                });
             } else {
-                // Insert matching bracket and place cursor between them
                 newValue =
                     localValue.substring(0, cursorPos) +
                     openingBracket +
                     BRACKETS_MAP[openingBracket] +
                     localValue.substring(cursorPos);
-
-                setLocalValue(newValue);
-                onChange(newValue);
-
-                // Place cursor between brackets
-                requestAnimationFrame(() => {
-                    editorRef.current.selectionStart = editorRef.current.selectionEnd = cursorPos + 1;
-                });
             }
+
+            setLocalValue(newValue);
+            onChange(newValue);
+
+            requestAnimationFrame(() => {
+                editorRef.current.selectionStart = editorRef.current.selectionEnd = cursorPos + (hasSelection ? 2 : 1);
+            });
         }
     }, [localValue, onChange]);
 
@@ -127,14 +112,13 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
         let currentLineIndex = 0;
         let charCount = 0;
 
-        while (charCount + lines[currentLineIndex].length + 1 <= cursorPosition) {
+        while (charCount + lines[currentLineIndex]?.length + 1 <= cursorPosition) {
             charCount += lines[currentLineIndex].length + 1;
             currentLineIndex++;
         }
 
         const currentLine = lines[currentLineIndex];
-        const words = currentLine.trim().split(/\s+/);
-        const lastWord = words[words.length - 1];
+        const lastWord = currentLine.trim().split(/\s+/).pop();
 
         lines[currentLineIndex] = currentLine.replace(lastWord, suggestion);
 
@@ -158,12 +142,10 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
             });
         } else if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
-            if (onSave) onSave();
+            onSave?.();
         } else if (showSuggestions && e.key === 'Enter') {
             e.preventDefault();
-            if (suggestions.length > 0) {
-                handleSuggestionSelect(suggestions[0]);
-            }
+            suggestions[0] && handleSuggestionSelect(suggestions[0]);
         } else if (showSuggestions && e.key === 'Escape') {
             setShowSuggestions(false);
         }
@@ -173,7 +155,7 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
         if (value !== localValue) {
             setLocalValue(value);
         }
-    }, [value, localValue]);
+    }, [value]);
 
     const highlightedCode = useMemo(() => {
         try {
@@ -188,39 +170,23 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
         }
     }, [localValue, language]);
 
-    const lineNumbers = useMemo(() => {
-        const lines = (localValue || '').split('\n').length;
-        return Array.from({ length: lines }, (_, i) => i + 1);
-    }, [localValue]);
+    const lineNumbers = useMemo(() => Array.from({ length: (localValue || '').split('\n').length }, (_, i) => i + 1), [localValue]);
 
-    const wordCount = useMemo(() => {
-        return (localValue.match(/\b\w+\b/g) || []).length;
-    }, [localValue]);
+    const wordCount = useMemo(() => (localValue.match(/\b\w+\b/g) || []).length, [localValue]);
 
-    const charCount = useMemo(() => {
-        return localValue.length;
-    }, [localValue]);
+    const charCount = useMemo(() => localValue.length, [localValue]);
 
-    const fileSize = useMemo(() => {
-        return new Blob([localValue]).size;
-    }, [localValue]);
+    const fileSize = useMemo(() => new Blob([localValue]).size, [localValue]);
 
     return (
         <div className="w-full h-full rounded-lg overflow-hidden border relative font-mono">
             <div className="p-2 text-sm flex items-center gap-2 w-full border-b">
-                <span className="ml-2">{wordCount}<sup>Words</sup></span> |
-                <span>{charCount}<sup>Characters</sup></span> |
-                <span>{fileSize}<sup>bytes</sup></span>
+                <span className="ml-2">{wordCount}<sup>words</sup></span> |
+                <span>{charCount}<sup>chars</sup></span> |
+                <span>{fileSize}<sup>bytes</sup></span> |
+                <span>{lineNumbers.length}<sup>line</sup></span>
             </div>
-            <div className="w-full h-full flex">
-                <div className="p-4 text-right text-gray-500 select-none bg-opacity-50 w-[50px]">
-                    {lineNumbers.map((num) => (
-                        <div key={num} className="leading-6">
-                            {num}
-                        </div>
-                    ))}
-                </div>
-
+            <div className="w-full  h-[1000px] flex">
                 <div className="relative flex-grow overflow-auto">
                     <textarea
                         ref={editorRef}
@@ -228,6 +194,12 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
                         onChange={handleChange}
                         onKeyDown={handleKeyDown}
                         onKeyPress={handleKeyPress}
+                        onScroll={(e) => {
+                            const scrollTop = e.target.scrollTop;
+                            const scrollLeft = e.target.scrollLeft;
+                            document.querySelector('.code-preview').scrollTop = scrollTop;
+                            document.querySelector('.code-preview').scrollLeft = scrollLeft;
+                        }}
                         className="absolute top-0 left-0 w-full h-full p-4 font-mono text-transparent caret-white bg-transparent resize-none outline-none z-10"
                         spellCheck="false"
                         autoCapitalize="off"
@@ -235,20 +207,26 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
                         autoCorrect="off"
                     />
 
-                    <pre className="w-full h-full p-4 m-0 overflow-hidden whitespace-pre-wrap break-words">
+                                        <pre
+                                            className="code-preview absolute top-0 left-0 w-full h-full p-4 m-0 overflow-hidden whitespace-pre-wrap break-words pointer-events-none"
+                                            style={{
+                                                fontFamily: 'monospace',
+                                                fontSize: 'inherit',
+                                                lineHeight: 'inherit',
+                                            }}
+                                        >
                         <code
                             className={`language-${language}`}
                             dangerouslySetInnerHTML={{__html: highlightedCode}}
                         />
                     </pre>
 
-
                     {showSuggestions && (
                         <div
-                            className="absolute z-20 bg-[#101010] border rounded-[6px] shadow-lg"
+                            className="absolute z-20 translate-y-7 bg-[#101010] border rounded-[6px] shadow-lg"
                             style={{
                                 top: suggestionPosition.top,
-                                left: suggestionPosition.left
+                                left: suggestionPosition.left - 10,
                             }}
                         >
                             {suggestions.map((suggestion, index) => (
@@ -499,13 +477,12 @@ const IDE = () => {
     return (
         <div className="w-screen h-screen">
             <Card className="bg-background w-full h-full border-none">
-                <div className="flex flex-col h-full">
-                    <div className="flex border-[1px] items-center justify-between px-4 py-2">
-                        <div className="flex items-center -ml-3 h-[30px] flex-row justify-start">
+                <div className="w-full h-full flex flex-col">
+                    <div className="flex border-[1px] items-center sticky w-full justify-between px-4 py-2">
+                        <div className="flex items-center -ml-3 h-[20px] flex-row justify-start">
                             <Menubar className="shadow-none border-none">
                                 <MenubarMenu>
-                                    <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1"><FileIcon
-                                        size={14}/> File</MenubarTrigger>
+                                    <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1"><FileIcon size={14}/> File</MenubarTrigger>
                                     <MenubarContent>
                                         <MenubarSub>
                                             <MenubarItem onClick={openFile}>
@@ -533,14 +510,17 @@ const IDE = () => {
                                     </MenubarContent>
                                 </MenubarMenu>
                                 <MenubarMenu>
-                                    <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1"><Package2Icon
+                                    <MenubarTrigger
+                                        className="text-sm flex flex-row items-center justify-center gap-1"><Package2Icon
                                         size={14}/> Projects</MenubarTrigger>
                                     <MenubarContent>
                                         <MenubarSub>
                                             <MenubarSubTrigger>New Web Project</MenubarSubTrigger>
                                             <MenubarSubContent>
-                                                <MenubarItem onClick={() => createFrameworkProject('HTML')}>HTML</MenubarItem>
-                                                <MenubarItem onClick={() => createFrameworkProject('Next')}>Next</MenubarItem>
+                                                <MenubarItem
+                                                    onClick={() => createFrameworkProject('HTML')}>HTML</MenubarItem>
+                                                <MenubarItem
+                                                    onClick={() => createFrameworkProject('Next')}>Next</MenubarItem>
                                                 <MenubarItem
                                                     onClick={() => createFrameworkProject('React')}>React</MenubarItem>
                                                 <MenubarItem
@@ -554,8 +534,10 @@ const IDE = () => {
                                                     onClick={() => createFrameworkProject('Tauri')}>Tauri</MenubarItem>
                                                 <MenubarItem
                                                     onClick={() => createFrameworkProject('Electron')}>Electron</MenubarItem>
-                                                <MenubarItem onClick={() => createFrameworkProject('ReactNative')}>React Native</MenubarItem>
-                                                <MenubarItem onClick={() => createFrameworkProject('Expo')}>Expo</MenubarItem>
+                                                <MenubarItem onClick={() => createFrameworkProject('ReactNative')}>React
+                                                    Native</MenubarItem>
+                                                <MenubarItem
+                                                    onClick={() => createFrameworkProject('Expo')}>Expo</MenubarItem>
                                             </MenubarSubContent>
                                         </MenubarSub>
                                     </MenubarContent>
@@ -568,9 +550,12 @@ const IDE = () => {
                                         <MenubarItem>
                                             Window
                                         </MenubarItem>
-                                        <MenubarItem>
-                                            Layout
-                                        </MenubarItem>
+                                        <MenubarSub>
+                                            <MenubarSubTrigger>Layout</MenubarSubTrigger>
+                                            <MenubarSubContent>
+                                                <MenubarItem onClick={() => setFolderSection(!folderSection)} className={"flex flex-row items-center justify-center gap-1"}>{folderSection === true ? <FolderOpen size={14}/> : <FolderClosed size={14}/>} Folder Section</MenubarItem>
+                                            </MenubarSubContent>
+                                        </MenubarSub>
                                         <MenubarItem>
                                             Optimization
                                         </MenubarItem>
@@ -607,10 +592,15 @@ const IDE = () => {
                                     ))}
                                 </SelectContent>
                             </Select>
+                                <button
+                                    className="flex items-center justify-center p-2 rounded-md hover:bg-accent transition-colors"
+                                    title="Run Code"
+                                >
+                                    <CopyIcon size={16} />
+                                </button>
                         </div>
                     </div>
-
-                    <div className="flex w-full flex-row gap-2">
+                    <div className="flex w-full h-full flex-row">
                         {folderSection && (
                             <div className="w-[15%] h-screen p-2 overflow-auto">
                                 <FileExplorer
@@ -622,13 +612,15 @@ const IDE = () => {
                             </div>
                         )}
 
-                        <CodeEditor
-                            key={activeTab} // Add key prop for better performance
-                            language={activeTabData?.language || "javascript"}
-                            value={activeTabData?.content || ""}
-                            onChange={updateTabContent}
-                            onSave={handleSave}
-                        />
+                        <div className="flex w-[85%] h-full flex-col">
+                            <CodeEditor
+                                key={activeTab}
+                                language={activeTabData?.language || "javascript"}
+                                value={activeTabData?.content || ""}
+                                onChange={updateTabContent}
+                                onSave={handleSave}
+                            />
+                        </div>
                     </div>
 
                     <div
@@ -642,14 +634,16 @@ const IDE = () => {
                                 onClose={closeTab}
                             />
                         ))}
+
                     </div>
+
 
                 </div>
             </Card>
         </div>
     );
 };
-const Tab = React.memo(({ tab, isActive, onActivate, onClose }) => (
+const Tab = React.memo(({tab, isActive, onActivate, onClose}) => (
     <div
         onClick={onActivate}
         className={`px-1 text-sm bg-transparent border-[1px] rounded-md cursor-pointer items-center justify-center flex flex-row ${isActive ? 'bg-accent' : ''}`}

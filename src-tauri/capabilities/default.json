@@ -12,15 +12,27 @@
     "fs:default",
     {
       "identifier": "fs:allow-exists",
-      "allow": [{ "path": "$APPDATA/*" }]
+      "allow": [
+        {
+          "path": "$APPDATA/*"
+        }
+      ]
     },
     {
       "identifier": "fs:allow-write-text-file",
       "allow": [
-        { "path": "$APPDATA/*" },
-        { "path": "$USERPROFILE/*" },
-        { "path": "$HOME/*" }
+        {
+          "path": "$APPDATA/*"
+        },
+        {
+          "path": "$USERPROFILE/*"
+        },
+        {
+          "path": "$HOME/*"
+        }
       ]
-    }
+    },
+    "shell:default",
+    "os:default"
   ]
 }
