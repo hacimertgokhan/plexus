@@ -80,8 +80,23 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
         }
     }, [value, localValue]);
 
+    const wordCount = useMemo(() => {
+        return (localValue.match(/\b\w+\b/g) || []).length;
+    }, [localValue]);
+
+    const charCount = useMemo(() => {
+        return localValue.length;
+    }, [localValue]);
+
+    const fileSize = useMemo(() => {
+        return new Blob([localValue]).size;
+    }, [localValue]);
+
     return (
         <div className="w-full h-full rounded-lg overflow-hidden border relative font-mono">
+            <div className="p-2 text-sm flex items-center gap-2 w-full border-b">
+                <span className={"ml-2"}>{wordCount}<sup>Words</sup></span> | <span>{charCount}<sup>Characters</sup></span> | <span>{fileSize}<sup>bytes</sup></span>
+            </div>
             <div className="w-full h-full flex">
                 <div className="p-4 text-right text-gray-500 select-none bg-opacity-50 w-[50px]">
                     {lineNumbers.map((num) => (
@@ -115,6 +130,7 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
         </div>
     );
 });
+
 
 CodeEditor.displayName = 'CodeEditor';
 
