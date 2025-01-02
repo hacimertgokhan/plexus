@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import { Card } from "@/components/ui/card";
 import 'xterm/css/xterm.css';
 import {
@@ -19,12 +19,13 @@ import {
     MenubarSubTrigger,
     MenubarTrigger,
 } from "@/components/ui/menubar";
-import Editor from '@monaco-editor/react';
 import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import {FileIcon, Package2Icon, Save, SettingsIcon, X} from "lucide-react";
-import {invoke} from "@tauri-apps/api/core";
+import { FileIcon, Package2Icon, Save, SettingsIcon, X } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import FileExplorer from "@/components/plexus/FileExplorer.jsx";
+import CodeEditor from "@/components/plexus/PlexusEditor.jsx";
+import debounce from "lodash/debounce";
 
 const languageExtensions = {
     'javascript': 'js',
@@ -48,33 +49,94 @@ const IDE = () => {
     const [currentFolder, setCurrentFolder] = useState(null);
     const [folderSection, setFolderSection] = useState(true);
 
+    const activeTabData = useMemo(() =>
+            tabs.find(tab => tab.id === activeTab),
+        [tabs, activeTab]
+    );
 
+    const tabContentRef = useRef({});
+
+    const updateTabContent = useCallback((content) => {
+        const tabId = activeTab;
+        tabContentRef.current[tabId] = content;
+
+        // Performans için setState'i throttle ediyoruz
+        debounce(() => {
+            setTabs(prevTabs =>
+                prevTabs.map(tab =>
+                    tab.id === tabId
+                        ? { ...tab, content: tabContentRef.current[tabId] }
+                        : tab
+                )
+            );
+        }, 100)();
+    }, [activeTab]);
+
+    const closeTab = useCallback((tabId, e) => {
+        e.stopPropagation();
+        if (tabs.length === 1) return;
+
+        setTabs(prevTabs => {
+            const newTabs = prevTabs.filter(tab => tab.id !== tabId);
+            setActiveTab(newTabs[newTabs.length - 1].id);
+            return newTabs;
+        });
+    }, [tabs.length]);
+
+    const languageOptions = useMemo(() =>
+            Object.keys(languageExtensions).map(lang => ({
+                value: lang,
+                label: lang.charAt(0).toUpperCase() + lang.slice(1)
+            })),
+        []
+    );
+
+// Dosya kaydetme işlemini optimize ediyoruz
     const saveFileToDisk = useCallback(async (tabId) => {
         const tab = tabs.find(tab => tab.id === tabId);
         if (!tab) return;
+
         try {
-            let filePath;
-            if (tab.filePath) {
-                filePath = tab.filePath;
-            } else {
+            const content = tabContentRef.current[tabId] || tab.content;
+            let filePath = tab.filePath;
+
+            if (!filePath) {
                 filePath = await save({
                     title: "Save File",
-                    filters: [{ name: tab.language, extensions: [languageExtensions[tab.language]] }]
+                    filters: [{
+                        name: tab.language,
+                        extensions: [languageExtensions[tab.language]]
+                    }]
                 });
             }
+
             if (filePath) {
-                await writeTextFile(filePath, tab.content);
-                setTabs(tabs.map(t =>
-                    t.id === tabId
-                        ? { ...t, filePath, saved: true, name: `${filePath.split('/').pop()}` }
-                        : t
-                ));
-                console.log(`File saved at: ${filePath}`);
+                await writeTextFile(filePath, content);
+                setTabs(prevTabs =>
+                    prevTabs.map(t =>
+                        t.id === tabId
+                            ? { ...t, filePath, saved: true, name: filePath.split('/').pop() }
+                            : t
+                    )
+                );
             }
         } catch (error) {
             console.error("Failed to save file:", error);
         }
     }, [tabs]);
+
+    useEffect(() => {
+        if (!autoSaveEnabled) return;
+
+        const autoSaveInterval = setInterval(() => {
+            const currentTab = tabs.find(tab => tab.id === activeTab);
+            if (currentTab?.filePath) {
+                saveFileToDisk(activeTab);
+            }
+        }, 30000); // 30 saniyede bir auto-save
+
+        return () => clearInterval(autoSaveInterval);
+    }, [autoSaveEnabled, activeTab, tabs, saveFileToDisk]);
 
     const openFile = useCallback(async () => {
         try {
@@ -129,21 +191,6 @@ const IDE = () => {
         setNextTabId(nextTabId + 1);
     };
 
-    const closeTab = (tabId, e) => {
-        e.stopPropagation();
-        if (tabs.length === 1) return;
-
-        const newTabs = tabs.filter(tab => tab.id !== tabId);
-        setTabs(newTabs);
-        setActiveTab(newTabs[newTabs.length - 1].id);
-    };
-
-    const updateTabContent = (content) => {
-        setTabs(tabs.map(tab =>
-            tab.id === activeTab ? { ...tab, content } : tab
-        ));
-    };
-
     const updateTabLanguage = (language) => {
         setTabs(tabs.map(tab => {
             if (tab.id === activeTab) {
@@ -163,9 +210,9 @@ const IDE = () => {
         try {
             const result = await invoke("create_project_command", { framework });
         } catch (error) {
+            console.error("Failed to create project:", error);
         }
     }, []);
-
 
     const openFolder = useCallback(async () => {
         try {
@@ -191,7 +238,6 @@ const IDE = () => {
                 filePath
             };
 
-            // Yeni sekme ekleniyor ve aktif sekme olarak ayarlanıyor
             setTabs([...tabs, newTab]);
             setActiveTab(nextTabId);
             setNextTabId(nextTabId + 1);
@@ -199,8 +245,6 @@ const IDE = () => {
             console.error("Failed to open file:", error);
         }
     };
-
-
 
     return (
         <div className="w-screen h-screen">
@@ -291,48 +335,36 @@ const IDE = () => {
                         </div>
                     </div>
 
-                    <div className={"flex w-full flex-row gap-2"}>
-                        <div className={`h-screen p-2 overflow-auto`}>
-                            <FileExplorer
-                                LoadTabs={createNewTabWithSpecifiedFile}
-                                currentFolder={currentFolder}
-                                onFileSelect={handleFileSelect}
-                                setActiveTab={setActiveTab} // Add this line to pass the setActiveTab function
-                            />
-                        </div>
-                        <Editor
-                            className={"w-[85%]"}
-                            language={tabs.find(tab => tab.id === activeTab)?.language}
-                            value={tabs.find(tab => tab.id === activeTab)?.content}
+                    <div className="flex w-full flex-row gap-2">
+                        {folderSection && (
+                            <div className="w-[15%] h-screen p-2 overflow-auto">
+                                <FileExplorer
+                                    LoadTabs={createNewTabWithSpecifiedFile}
+                                    currentFolder={currentFolder}
+                                    onFileSelect={handleFileSelect}
+                                    setActiveTab={setActiveTab}
+                                />
+                            </div>
+                        )}
+
+                        <CodeEditor
+                            key={activeTab} // Add key prop for better performance
+                            language={activeTabData?.language || "javascript"}
+                            value={activeTabData?.content || ""}
                             onChange={updateTabContent}
-                            theme={"vs-dark"}
-                            options={{
-                                autoClosingQuotes: "languageDefined",
-                                autoSurround: "languageDefined",
-                                lineNumbers: "on",
-                                automaticLayout: true,
-                                wordWrap: 'on',
-                                suggestOnTriggerCharacters: true,
-                                snippetSuggestions: 'top',
-                            }}
                         />
                     </div>
 
-                    <div className="flex flex-row fixed bottom-0 p-1 bg-background w-full h-fit items-start">
+                    <div
+                        className="flex flex-row fixed bottom-0 p-1 bg-background w-full h-fit items-start overflow-x-auto">
                         {tabs.map(tab => (
-                            <div
+                            <Tab
                                 key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`px-1 text-sm bg-transparent border-[1px] rounded-md cursor-pointer items-center justify-center flex flex-row ${activeTab === tab.id ? 'bg-accent' : ''}`}
-                            >
-                                <p className={`overflow-hidden text-ellipsis w-[100px]`}>{tab.name}</p>
-                                <button
-                                    onClick={(e) => closeTab(tab.id, e)}
-                                    className="text-foreground p-2 rounded-xl hover:bg-background ml-2"
-                                >
-                                    <X className="w-3 h-3"/>
-                                </button>
-                            </div>
+                                tab={tab}
+                                isActive={activeTab === tab.id}
+                                onActivate={() => setActiveTab(tab.id)}
+                                onClose={closeTab}
+                            />
                         ))}
                     </div>
 
@@ -342,4 +374,19 @@ const IDE = () => {
     );
 };
 
-export default IDE;
+const Tab = React.memo(({ tab, isActive, onActivate, onClose }) => (
+    <div
+        onClick={onActivate}
+        className={`px-1 text-sm bg-transparent border-[1px] rounded-md cursor-pointer items-center justify-center flex flex-row ${isActive ? 'bg-accent' : ''}`}
+    >
+        <p className="overflow-hidden text-ellipsis w-[100px]">{tab.name}</p>
+        <button
+            onClick={(e) => onClose(tab.id, e)}
+            className="text-foreground p-2 rounded-xl hover:bg-background ml-2"
+        >
+            <X className="w-3 h-3"/>
+        </button>
+    </div>
+));
+
+export default React.memo(IDE);

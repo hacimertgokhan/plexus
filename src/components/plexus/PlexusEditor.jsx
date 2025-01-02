@@ -1,80 +1,75 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Prism from 'prismjs';
-// Sadece temel diller
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-python';
 import 'prismjs/themes/prism-tomorrow.css';
+import debounce from "lodash/debounce";
 
-const CodeEditor = () => {
-    const [code, setCode] = useState('// Write your code here...');
-    const [language, setLanguage] = useState('javascript');
-    const [lineNumbers, setLineNumbers] = useState(['1']);
-    const [highlightedCode, setHighlightedCode] = useState('');
+const CodeEditor = React.memo(({ language, value, onChange }) => {
+    const editorRef = useRef(null);
+    const [localValue, setLocalValue] = useState(value);
 
-    // Sadece temel diller
-    const languages = [
-        { value: 'javascript', label: 'JavaScript' },
-        { value: 'python', label: 'Python' }
-    ];
+    // Değişiklikleri ana bileşene iletmek için debounce kullanıyoruz
+    const debouncedOnChange = useCallback(
+        debounce((newValue) => {
+            onChange(newValue);
+        }, 100),
+        [onChange]
+    );
 
-    useEffect(() => {
+    // TextArea'daki değişiklikleri yönetiyoruz
+    const handleChange = useCallback((e) => {
+        const newValue = e.target.value;
+        setLocalValue(newValue);
+        debouncedOnChange(newValue);
+    }, [debouncedOnChange]);
+
+    // Prism ile kod vurgulamayı yönetiyoruz
+    const highlightedCode = useMemo(() => {
         try {
-            // Highlight işlemini güvenli bir şekilde yap
-            const highlighted = Prism.highlight(
-                code,
+            return Prism.highlight(
+                localValue || '',
                 Prism.languages[language] || Prism.languages.javascript,
                 language
             );
-            setHighlightedCode(highlighted);
-
-            const lines = code.split('\n');
-            const newLineNumbers = lines.map((_, i) => (i + 1).toString());
-            setLineNumbers(newLineNumbers);
         } catch (error) {
             console.error('Highlighting error:', error);
-            setHighlightedCode(code);
+            return localValue || '';
         }
-    }, [code, language]);
+    }, [localValue, language]);
 
-    const handleCodeChange = (e) => {
-        setCode(e.target.value);
-    };
+    // Satır numaralarını hesaplıyoruz
+    const lineNumbers = useMemo(() => {
+        const lines = (localValue || '').split('\n').length;
+        return Array.from({ length: lines }, (_, i) => i + 1);
+    }, [localValue]);
 
-    const handleLanguageChange = (e) => {
-        setLanguage(e.target.value);
-    };
+    // Tab tuşunu yönetiyoruz
+    const handleKeyDown = useCallback((e) => {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = e.target.selectionStart;
+            const end = e.target.selectionEnd;
+            const newValue = localValue.substring(0, start) + '    ' + localValue.substring(end);
+            setLocalValue(newValue);
+            debouncedOnChange(newValue);
 
-    const copyToClipboard = () => {
-        navigator.clipboard.writeText(code);
-    };
+            // Cursor pozisyonunu güncelliyoruz
+            requestAnimationFrame(() => {
+                e.target.selectionStart = e.target.selectionEnd = start + 4;
+            });
+        }
+    }, [localValue, debouncedOnChange]);
+
+    useEffect(() => {
+        setLocalValue(value);
+    }, [value]);
 
     return (
-        <div className="w-full max-w-4xl rounded-lg overflow-hidden border border-gray-200 bg-gray-800">
-            {/* Toolbar */}
-            <div className="flex items-center gap-2 px-4 py-2 bg-gray-700">
-                <select
-                    value={language}
-                    onChange={handleLanguageChange}
-                    className="px-2 py-1 rounded bg-gray-600 text-white text-sm"
-                >
-                    {languages.map((lang) => (
-                        <option key={lang.value} value={lang.value}>
-                            {lang.label}
-                        </option>
-                    ))}
-                </select>
-                <button
-                    onClick={copyToClipboard}
-                    className="px-3 py-1 text-sm rounded bg-gray-600 hover:bg-gray-500 text-white"
-                >
-                    Copy
-                </button>
-            </div>
-
-            {/* Editor Area */}
-            <div className="relative flex">
-                {/* Line Numbers */}
-                <div className="p-4 text-right bg-gray-900 text-gray-500 select-none">
+        <div className="w-full h-full rounded-lg overflow-hidden border relative font-mono">
+            <div className="w-full h-full flex">
+                {/* Satır numaraları */}
+                <div className="p-4 text-right text-gray-500 select-none bg-opacity-50 w-[50px]">
                     {lineNumbers.map((num) => (
                         <div key={num} className="leading-6">
                             {num}
@@ -82,37 +77,34 @@ const CodeEditor = () => {
                     ))}
                 </div>
 
-                {/* Code Input */}
-                <div className="relative flex-grow">
-          <textarea
-              value={code}
-              onChange={handleCodeChange}
-              className="w-full h-full p-4 bg-transparent text-transparent font-mono leading-6 focus:outline-none resize-none absolute z-10 caret-white"
-              spellCheck="false"
-              rows={10}
-          />
-                    <pre className="w-full h-full p-4 m-0 font-mono leading-6 pointer-events-none">
-            <code
-                className={`language-${language}`}
-                dangerouslySetInnerHTML={{ __html: highlightedCode }}
-            />
-          </pre>
-                </div>
-            </div>
+                {/* Editor container */}
+                <div className="relative flex-grow overflow-auto">
+                    {/* TextArea */}
+                    <textarea
+                        ref={editorRef}
+                        value={localValue}
+                        onChange={handleChange}
+                        onKeyDown={handleKeyDown}
+                        className="absolute top-0 left-0 w-full h-full p-4 font-mono text-transparent caret-white bg-transparent resize-none outline-none z-10"
+                        spellCheck="false"
+                        autoCapitalize="off"
+                        autoComplete="off"
+                        autoCorrect="off"
+                    />
 
-            {/* Status Bar */}
-            <div className="px-4 py-2 bg-gray-700 text-gray-300 text-sm flex justify-between items-center">
-                <div>
-                    <span>Lines: {lineNumbers.length}</span>
-                    <span className="mx-4">|</span>
-                    <span>Characters: {code.length}</span>
-                </div>
-                <div>
-                    <span className="text-blue-300">{language.toUpperCase()}</span>
+                    {/* Syntax highlighting */}
+                    <pre className="w-full h-full p-4 m-0 overflow-hidden whitespace-pre-wrap break-words">
+                        <code
+                            className={`language-${language}`}
+                            dangerouslySetInnerHTML={{ __html: highlightedCode }}
+                        />
+                    </pre>
                 </div>
             </div>
         </div>
     );
-};
+});
+
+CodeEditor.displayName = 'CodeEditor';
 
 export default CodeEditor;
