@@ -15,6 +15,12 @@
       "allow": [
         {
           "path": "$APPDATA/*"
+        },
+        {
+          "path": "$USERPROFILE/*"
+        },
+        {
+          "path": "$HOME/*"
         }
       ]
     },

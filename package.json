@@ -17,12 +17,12 @@
     "@radix-ui/react-select": "^2.1.4",
     "@radix-ui/react-slot": "^1.1.1",
     "@shadcn/ui": "^0.0.4",
-    "@tauri-apps/api": "^2.1.1",
-    "@tauri-apps/plugin-dialog": "~2",
-    "@tauri-apps/plugin-fs": "~2",
-    "@tauri-apps/plugin-opener": "^2",
-    "@tauri-apps/plugin-os": "~2",
-    "@tauri-apps/plugin-shell": "~2",
+    "@tauri-apps/api": "^2.2.0",
+    "@tauri-apps/plugin-dialog": "~2.2.0",
+    "@tauri-apps/plugin-fs": "~2.2.0",
+    "@tauri-apps/plugin-opener": "^2.2.2",
+    "@tauri-apps/plugin-os": "~2.2.0",
+    "@tauri-apps/plugin-shell": "~2.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lodash": "^4.17.21",
@@ -38,14 +38,14 @@
     "xterm-addon-web-links": "^0.9.0"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2",
-    "@types/node": "^22.10.2",
+    "@tauri-apps/cli": "^2.2.1",
+    "@types/node": "^22.10.5",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
-    "vite": "^6.0.3",
+    "vite": "^6.0.7",
     "vite-plugin-tauri": "^4.0.0"
   }
 }

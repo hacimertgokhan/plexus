@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Plexus",
+        "title": "Plexus IDE",
         "width": 1280,
         "height": 720
       }

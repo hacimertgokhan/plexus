@@ -18,7 +18,7 @@ import {
     MenubarSubTrigger,
     MenubarTrigger,
 } from "@/components/ui/menubar";
-import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
+import {writeTextFile, readTextFile, readDir} from "@tauri-apps/plugin-fs";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import {FileIcon, Package2Icon, Code2Icon, SettingsIcon, X, CopyIcon, FolderOpen, FolderClosed} from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
@@ -53,10 +53,22 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
         }
 
         const currentLine = lines[currentLineIndex] || '';
-        const lastWord = currentLine.trim().split(/\s+/).pop();
+        const words = currentLine.trim().split(/\s+/);
+        const lastWord = words.pop() || ''; // Son kelimeyi alıyoruz
 
-        const suggestionsForLanguage = SUGGESTIONS[language.toLowerCase()] || {};
-        if (suggestionsForLanguage[lastWord]) {
+        const suggestionsForLanguage = SUGGESTIONS[language?.toLowerCase()] || {};
+        let matchingSuggestions = [];
+
+        if (lastWord) {
+            matchingSuggestions = Object.keys(suggestionsForLanguage).filter(key =>
+                key.startsWith(lastWord)
+            ).reduce((acc, key) => {
+                acc.push(...suggestionsForLanguage[key]);
+                return acc
+            }, []);
+        }
+
+        if (matchingSuggestions.length > 0) {
             const rect = editorRef.current?.getBoundingClientRect();
             const lineHeight = 24;
 
@@ -64,10 +76,11 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
                 top: (currentLineIndex + 1) * lineHeight,
                 left: currentLine.length * 8,
             });
-            setSuggestions(suggestionsForLanguage[lastWord]);
+            setSuggestions(matchingSuggestions);
             setShowSuggestions(true);
         } else {
             setShowSuggestions(false);
+            setSuggestions([]);
         }
     }, [onChange, language]);
 
@@ -120,6 +133,7 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
         const currentLine = lines[currentLineIndex];
         const lastWord = currentLine.trim().split(/\s+/).pop();
 
+        // Son kelimeyi sadece seçilen öneri ile değiştirme
         lines[currentLineIndex] = currentLine.replace(lastWord, suggestion);
 
         const newValue = lines.join('\n');
@@ -148,8 +162,18 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
             suggestions[0] && handleSuggestionSelect(suggestions[0]);
         } else if (showSuggestions && e.key === 'Escape') {
             setShowSuggestions(false);
+        } else if (e.ctrlKey && e.key === ' ') { // CTRL + Space tuş kombinasyonu
+            e.preventDefault();
+            // Kütüphanedeki tüm önerileri göstermek
+            const suggestionsForLanguage = SUGGESTIONS[language?.toLowerCase()] || {};
+            let allSuggestions = [];
+            Object.keys(suggestionsForLanguage).forEach(key => {
+                allSuggestions.push(...suggestionsForLanguage[key]);
+            });
+            setSuggestions(allSuggestions);
+            setShowSuggestions(true);
         }
-    }, [localValue, onChange, onSave, showSuggestions, suggestions, handleSuggestionSelect]);
+    }, [localValue, onChange, onSave, showSuggestions, suggestions, handleSuggestionSelect, language]);
 
     useEffect(() => {
         if (value !== localValue) {
@@ -207,14 +231,14 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
                         autoCorrect="off"
                     />
 
-                                        <pre
-                                            className="code-preview absolute top-0 left-0 w-full h-full p-4 m-0 overflow-hidden whitespace-pre-wrap break-words pointer-events-none"
-                                            style={{
-                                                fontFamily: 'monospace',
-                                                fontSize: 'inherit',
-                                                lineHeight: 'inherit',
-                                            }}
-                                        >
+                    <pre
+                        className="code-preview absolute top-0 left-0 w-full h-full p-4 m-0 overflow-hidden whitespace-pre-wrap break-words pointer-events-none"
+                        style={{
+                            fontFamily: 'monospace',
+                            fontSize: 'inherit',
+                            lineHeight: 'inherit',
+                        }}
+                    >
                         <code
                             className={`language-${language}`}
                             dangerouslySetInnerHTML={{__html: highlightedCode}}
@@ -268,8 +292,9 @@ const IDE = () => {
     const [nextTabId, setNextTabId] = useState(2);
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
     const [currentFolder, setCurrentFolder] = useState(null);
-    const [folderSection, setFolderSection] = useState(true);
-
+    const [folderSection, setFolderSection] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
     const activeTabData = useMemo(() =>
             tabs.find(tab => tab.id === activeTab),
         [tabs, activeTab]
@@ -434,15 +459,39 @@ const IDE = () => {
     const openFolder = useCallback(async () => {
         try {
             const folderPath = await open({
-                directory: true
+                directory: true,
+                multiple: false,
+                recursive: true,
+                defaultPath: currentFolder || undefined
             });
-            if (folderPath) {
-                setCurrentFolder(folderPath);
+            if (!folderPath) {
+                console.log("Folder selection cancelled");
+                return;
             }
+            if (typeof folderPath !== 'string') {
+                throw new Error("Invalid folder path type");
+            }
+            if (!folderPath.trim()) {
+                throw new Error("Empty folder path");
+            }
+            setLoading(true);
+            try {
+                await readDir(folderPath);
+                setCurrentFolder(folderPath);
+                console.log(folderPath)
+                setError('');
+            } catch (err) {
+                throw new Error(`Selected folder is not accessible: ${err.message}`);
+            } finally {
+                setLoading(false);
+            }
+
         } catch (error) {
             console.error("Failed to open folder:", error);
+            setError(`Failed to open folder: ${error.message}`);
+            setLoading(false);
         }
-    }, []);
+    }, [currentFolder]); // currentFolder dependency'si ekledik
 
     const handleFileSelect = async (filePath, lang) => {
         try {
@@ -594,7 +643,10 @@ const IDE = () => {
                             </Select>
                                 <button
                                     className="flex items-center justify-center p-2 rounded-md hover:bg-accent transition-colors"
-                                    title="Run Code"
+                                    title="Copy Code"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(activeTabData?.content || "")
+                                    }}
                                 >
                                     <CopyIcon size={16} />
                                 </button>
@@ -603,16 +655,20 @@ const IDE = () => {
                     <div className="flex w-full h-full flex-row">
                         {folderSection && (
                             <div className="w-[15%] h-screen p-2 overflow-auto">
-                                <FileExplorer
-                                    LoadTabs={createNewTabWithSpecifiedFile}
-                                    currentFolder={currentFolder}
-                                    onFileSelect={handleFileSelect}
-                                    setActiveTab={setActiveTab}
-                                />
+                                {
+                                    !loading && (
+                                        <FileExplorer
+                                            LoadTabs={createNewTabWithSpecifiedFile}
+                                            currentFolder={currentFolder}
+                                            onFileSelect={handleFileSelect}
+                                            setActiveTab={setActiveTab}
+                                        />
+                                    )
+                                }
                             </div>
                         )}
 
-                        <div className="flex w-[85%] h-full flex-col">
+                        <div className={`${folderSection === true ? "w-[85%]" : "w-[100%]"} flex h-full flex-col`}>
                             <CodeEditor
                                 key={activeTab}
                                 language={activeTabData?.language || "javascript"}
@@ -624,7 +680,7 @@ const IDE = () => {
                     </div>
 
                     <div
-                        className="flex flex-row fixed bottom-0 p-1 bg-background w-full h-fit items-start overflow-x-auto">
+                        className="flex flex-row fixed bottom-0 z-[100] p-1 bg-background w-full h-fit items-start overflow-x-auto">
                         {tabs.map(tab => (
                             <Tab
                                 key={tab.id}
@@ -646,7 +702,7 @@ const IDE = () => {
 const Tab = React.memo(({tab, isActive, onActivate, onClose}) => (
     <div
         onClick={onActivate}
-        className={`px-1 text-sm bg-transparent border-[1px] rounded-md cursor-pointer items-center justify-center flex flex-row ${isActive ? 'bg-accent' : ''}`}
+        className={`px-1 text-sm bg-background border-[1px] rounded-md cursor-pointer items-center z-[100] justify-center flex flex-row ${isActive ? 'text-green-500' : ''}`}
     >
         <p className="overflow-hidden text-ellipsis w-[100px]">{tab.name}</p>
         <button

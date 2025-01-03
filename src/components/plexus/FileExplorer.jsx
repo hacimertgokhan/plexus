@@ -1,11 +1,13 @@
 import {ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger} from "@/components/ui/context-menu";
 import {FileIcon, FolderIcon} from "lucide-react";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { writeTextFile, readTextFile, readDir, create, remove } from "@tauri-apps/plugin-fs";
 import {Button} from "@/components/ui/button";
 import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {Input} from "@/components/ui/input";
 import * as pathModule from "@tauri-apps/api/path";
+import { normalize, appDataDir } from '@tauri-apps/api/path';
+import { open } from '@tauri-apps/plugin-dialog';
 
 const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
     const [tree, setTree] = useState({ files: [], folders: [] });
@@ -21,16 +23,136 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        if (currentFolder) {
-            loadFolder(currentFolder);
+    const openFolder = useCallback(async () => {
+        try {
+            const folderPath = await open({
+                directory: true,
+                multiple: false,
+                defaultPath: currentFolder || undefined
+            });
+
+            if (!folderPath) {
+                console.log("Folder selection cancelled");
+                return;
+            }
+
+            if (typeof folderPath !== 'string') {
+                throw new Error("Invalid folder path type");
+            }
+
+            if (!folderPath.trim()) {
+                throw new Error("Empty folder path");
+            }
+
+            setLoading(true);
+            try {
+                const entries = await readDir(folderPath);
+                setCurrentFolder(folderPath);
+                setError('');
+            } catch (err) {
+                throw new Error(`Selected folder is not accessible: ${err.message}`);
+            } finally {
+                setLoading(false);
+            }
+
+        } catch (error) {
+            console.error("Failed to open folder:", error);
+            setError(`Failed to open folder: ${error.message}`);
+            setLoading(false);
         }
     }, [currentFolder]);
 
+    useEffect(() => {
+        if (currentFolder) {
+            loadFolder(currentFolder, true);
+        }
+    }, [currentFolder]);
+
+    const loadFolder = async (_path, updateTree = false) => {
+        if (!_path || typeof _path !== 'string') {
+            console.error("Invalid path:", _path);
+            setError('Invalid path provided');
+            return null;
+        }
+
+        if (updateTree) {
+            setLoading(true);
+            setError('');
+        }
+
+        try {
+            // Path'i normalize et
+            const normalizedPath = await normalize(_path);
+
+            if (folderContents[normalizedPath] && !updateTree) {
+                return folderContents[normalizedPath];
+            }
+
+            const entries = await readDir(normalizedPath);
+
+            if (!Array.isArray(entries)) {
+                throw new Error("Invalid directory content");
+            }
+
+            const data = await Promise.all(entries.map(async (entry) => {
+                if (!entry || !entry.name) {
+                    return null;
+                }
+
+                try {
+                    const entryPath = await pathModule.join(normalizedPath, entry.name);
+                    return {
+                        path: entryPath,
+                        name: entry.name,
+                        language: entry.name.split('.').pop(),
+                        type: entry.isDirectory ? 'folder' : 'file',
+                        content: entry.isDirectory ? [] : null
+                    };
+                } catch (err) {
+                    console.error("Error processing entry:", err);
+                    return null;
+                }
+            }));
+
+            const validData = data.filter(item => item !== null);
+
+            const folders = validData.filter(entry => entry.type === 'folder');
+            const files = validData.filter(entry => entry.type === 'file');
+            const newContents = { files, folders };
+
+            setFolderContents(prev => ({
+                ...prev,
+                [normalizedPath]: newContents
+            }));
+
+            if (updateTree || normalizedPath === currentFolder) {
+                setTree(newContents);
+                setCurrentPath(normalizedPath);
+            }
+
+            if (updateTree) {
+                setLoading(false);
+            }
+
+            return newContents;
+        } catch (error) {
+            console.error("Failed to load folder:", error);
+            const errorMessage = error?.message || 'Unknown error occurred';
+            setError(`Failed to load folder: ${errorMessage}`);
+
+            if (updateTree) {
+                setLoading(false);
+            }
+
+            return { files: [], folders: [] };
+        }
+    };
+
     const deleteFile = async (path) => {
         try {
-            await remove(path);
-            await loadFolder(currentPath);
+            const normalizedPath = await normalize(path);
+            await remove(normalizedPath);
+            await loadFolder(currentPath, true);
         } catch (error) {
             console.error("Failed to delete file:", error);
             setError('Failed to delete file');
@@ -39,8 +161,9 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
 
     const deleteFolder = async (path) => {
         try {
-            await remove(path, { recursive: true });
-            await loadFolder(currentPath);
+            const normalizedPath = await normalize(path);
+            await remove(normalizedPath, { recursive: true });
+            await loadFolder(currentPath, true);
         } catch (error) {
             console.error("Failed to delete folder:", error);
             setError('Failed to delete folder');
@@ -48,13 +171,25 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
     };
 
     const createNewFile = async (parentPath) => {
-        setSelectedPath(parentPath);
-        setIsNewFileDialogOpen(true);
+        try {
+            const normalizedPath = await normalize(parentPath);
+            setSelectedPath(normalizedPath);
+            setIsNewFileDialogOpen(true);
+        } catch (error) {
+            console.error("Failed to normalize path:", error);
+            setError('Failed to create file: Invalid path');
+        }
     };
 
     const createNewFolder = async (parentPath) => {
-        setSelectedPath(parentPath);
-        setIsNewFolderDialogOpen(true);
+        try {
+            const normalizedPath = await normalize(parentPath);
+            setSelectedPath(normalizedPath);
+            setIsNewFolderDialogOpen(true);
+        } catch (error) {
+            console.error("Failed to normalize path:", error);
+            setError('Failed to create folder: Invalid path');
+        }
     };
 
     const handleCreateFile = async () => {
@@ -63,7 +198,7 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
             await writeTextFile(newPath, '');
             setIsNewFileDialogOpen(false);
             setNewItemName('');
-            await loadFolder(currentPath);
+            await loadFolder(currentPath, true);
         } catch (error) {
             console.error("Failed to create file:", error);
             setError('Failed to create file');
@@ -76,7 +211,7 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
             await create(newPath);
             setIsNewFolderDialogOpen(false);
             setNewItemName('');
-            await loadFolder(currentPath);
+            await loadFolder(currentPath, true);
         } catch (error) {
             console.error("Failed to create folder:", error);
             setError('Failed to create folder');
@@ -84,9 +219,15 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
     };
 
     const renameFile = async (path) => {
-        setSelectedPath(path);
-        setNewItemName(path.split('/').pop());
-        setIsRenameDialogOpen(true);
+        try {
+            const normalizedPath = await normalize(path);
+            setSelectedPath(normalizedPath);
+            setNewItemName(normalizedPath.split('/').pop());
+            setIsRenameDialogOpen(true);
+        } catch (error) {
+            console.error("Failed to normalize path:", error);
+            setError('Failed to rename file: Invalid path');
+        }
     };
 
     const handleRename = async () => {
@@ -95,122 +236,105 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
             // Rename logic here
             setIsRenameDialogOpen(false);
             setNewItemName('');
-            await loadFolder(currentPath);
+            await loadFolder(currentPath, true);
         } catch (error) {
             console.error("Failed to rename file:", error);
             setError('Failed to rename file');
         }
     };
 
-    const loadFolder = async (_path) => {
-        setLoading(true);
+    const toggleFolder = async (path) => {
+        if (!path) {
+            console.error("Invalid path in toggleFolder");
+            return;
+        }
+
         try {
-            const entries = await readDir(_path);
-            const data = await Promise.all(entries.map(async (entry) => {
-                const entryPath = await pathModule.join(_path, entry.name);
+            setError('');
+            const normalizedPath = await normalize(path);
+            const isExpanded = expandedFolders.has(normalizedPath);
 
-                const entryData = {
-                    path: entryPath,
-                    name: entry.name,
-                    language: entry.name.split('.').pop()
-                };
-
-                if (entry.isDirectory) {
-                    entryData.type = 'folder';
-                    entryData.content = [];
-                } else {
-                    entryData.type = 'file';
-                    entryData.content = null;
+            if (!isExpanded) {
+                const contents = await loadFolder(normalizedPath, false);
+                if (!contents) {
+                    throw new Error("Failed to load folder contents");
                 }
-
-                return entryData;
-            }));
-
-            const folders = data.filter(entry => entry.type === 'folder');
-            const files = data.filter(entry => entry.type === 'file');
-
-            setFolderContents(prev => ({
-                ...prev,
-                [_path]: { files, folders }
-            }));
-
-            if (_path === currentFolder) {
-                setTree({ files, folders });
             }
 
-            setCurrentPath(_path);
-            setLoading(false);
-            return { files, folders };
+            setExpandedFolders(prev => {
+                const next = new Set(prev);
+                if (isExpanded) {
+                    next.delete(normalizedPath);
+                } else {
+                    next.add(normalizedPath);
+                }
+                return next;
+            });
         } catch (error) {
-            console.error("Failed to load folder:", error);
-            setError(`Failed to load folder: ${_path}`);
-            setLoading(false);
-            return { files: [], folders: [] };
+            console.error("Failed to toggle folder:", error);
+            setError(`Failed to toggle folder: ${error.message}`);
         }
     };
 
-    const toggleFolder = async (path) => {
-        setExpandedFolders(prev => {
-            const next = new Set(prev);
-            if (next.has(path)) {
-                next.delete(path);
-            } else {
-                next.add(path);
-                loadFolder(path);
-            }
-            return next;
-        });
-    };
+    const renderTree = (items) => {
+        if (!items || !items.folders || !items.files) {
+            return null;
+        }
 
-    const renderTree = (items) => (
-        <div className="pl-1">
-            {items?.folders?.map(folder => (
-                <div key={folder.path}>
-                    <ContextMenu>
+        return (
+            <div className="pl-4">
+                {items.folders.map(folder => (
+                    <div key={folder.path}>
+                        <ContextMenu>
+                            <ContextMenuTrigger>
+                                <div
+                                    className="flex items-center gap-2 hover:bg-accent p-1 rounded cursor-pointer"
+                                    onClick={() => toggleFolder(folder.path)}
+                                >
+                                    <FolderIcon size={16} />
+                                    <span>{folder.name}</span>
+                                </div>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                                <ContextMenuItem onClick={() => createNewFile(folder.path)}>New File</ContextMenuItem>
+                                <ContextMenuItem onClick={() => createNewFolder(folder.path)}>New Folder</ContextMenuItem>
+                                <ContextMenuItem onClick={() => deleteFolder(folder.path)}>Delete</ContextMenuItem>
+                            </ContextMenuContent>
+                        </ContextMenu>
+                        {expandedFolders.has(folder.path) && folderContents[folder.path] && (
+                            renderTree(folderContents[folder.path])
+                        )}
+                    </div>
+                ))}
+                {items.files.map(file => (
+                    <ContextMenu key={file.path}>
                         <ContextMenuTrigger>
                             <div
-                                className="flex items-center gap-2 hover:bg-accent p-1 rounded cursor-pointer"
-                                onClick={() => toggleFolder(folder.path)}
+                                className="flex items-center gap-2 hover:bg-accent p-1 rounded cursor-pointer pl-6"
+                                onClick={() => {
+                                    onFileSelect(file.path, file.language)
+                                    LoadTabs(file.name, file.content, file.path);
+                                }}
                             >
-                                <FolderIcon size={16} />
-                                <span>{folder.name}</span>
+                                <FileIcon size={16} />
+                                <span>{file.name}</span>
                             </div>
                         </ContextMenuTrigger>
                         <ContextMenuContent>
-                            <ContextMenuItem onClick={() => createNewFile(folder.path)}>New File</ContextMenuItem>
-                            <ContextMenuItem onClick={() => createNewFolder(folder.path)}>New Folder</ContextMenuItem>
-                            <ContextMenuItem onClick={() => deleteFolder(folder.path)}>Delete</ContextMenuItem>
+                            <ContextMenuItem onClick={() => deleteFile(file.path)}>Delete</ContextMenuItem>
+                            <ContextMenuItem onClick={() => renameFile(file.path)}>Rename</ContextMenuItem>
                         </ContextMenuContent>
                     </ContextMenu>
-                    {expandedFolders.has(folder.path) && folderContents[folder.path] && (
-                        renderTree(folderContents[folder.path])
-                    )}
-                </div>
-            ))}
-            {items?.files?.map(file => (
-                <ContextMenu key={file.path}>
-                    <ContextMenuTrigger>
-                        <div
-                            className="flex items-center gap-2 hover:bg-accent p-1 rounded cursor-pointer pl-6"
-                            onClick={() => {
-                                onFileSelect(file.path, file.language)
-                                LoadTabs(file.name, file.content, file.path);
-                            }}
-                        >
-                            <FileIcon size={16} />
-                            <span>{file.name}</span>
-                        </div>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent>
-                        <ContextMenuItem onClick={() => deleteFile(file.path)}>Delete</ContextMenuItem>
-                        <ContextMenuItem onClick={() => renameFile(file.path)}>Rename</ContextMenuItem>
-                    </ContextMenuContent>
-                </ContextMenu>
-            ))}
-        </div>
-    );
+                ))}
+            </div>
+        );
+    };
 
     const filteredTree = (tree, searchQuery) => {
+        if (!tree || !tree.files || !tree.folders) {
+            return { files: [], folders: [] };
+        }
+
         const { files, folders } = tree;
         const filteredFolders = folders.filter(folder => folder.name.toLowerCase().includes(searchQuery.toLowerCase()));
         const filteredFiles = files.filter(file => file.name.toLowerCase().includes(searchQuery.toLowerCase()));

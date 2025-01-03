@@ -1,3 +1,4 @@
+
 export const SUGGESTIONS = {
     go: {
         'fn': ['fn function_name() {}', 'fn function_name(param: Type) -> ReturnType {}'],
@@ -166,7 +167,18 @@ export const SUGGESTIONS = {
         'localStorageRemoveItem': ['localStorage.removeItem(key);'],
         'sessionStorageSetItem': ['sessionStorage.setItem(key, value);'],
         'sessionStorageGetItem': ['sessionStorage.getItem(key);'],
-        'sessionStorageRemoveItem': ['sessionStorage.removeItem(key);']
+        'sessionStorageRemoveItem': ['sessionStorage.removeItem(key);'],
+        'useEffect': ['useEffect(() => { /* side effect */ }, []);', 'useEffect(() => { return () => { /* cleanup */ }; }, [dependencies]);'],
+        'useState': ['const [state, setState] = useState(initialValue);'],
+        'useRef': ['const ref = useRef(null);'],
+        'useContext': ['const value = useContext(SomeContext);'],
+        'useReducer': ['const [state, dispatch] = useReducer(reducer, initialState);'],
+        'useCallback': ['const memoizedCallback = useCallback(() => { /* function */ }, [dependencies]);'],
+        'useMemo': ['const memoizedValue = useMemo(() => computeExpensiveValue(param), [param]);'],
+        'useLayoutEffect': ['useLayoutEffect(() => { /* effect */ }, [dependencies]);'],
+        'useImperativeHandle': ['useImperativeHandle(ref, () => ({ /* instance methods */ }), [dependencies]);'],
+        'useDebugValue': ['useDebugValue(value);'],
+        'useId': ['const id = useId();'],
     },
     python: {
         'def': ['def function_name():', 'def function_name(param1, param2):', 'def function_name() -> ReturnType:'],
