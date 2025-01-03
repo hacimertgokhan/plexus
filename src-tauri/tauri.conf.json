@@ -14,7 +14,9 @@
       {
         "title": "Plexus IDE",
         "width": 1280,
-        "height": 720
+        "height": 720,
+        "resizable": true,
+        "fullscreen": false
       }
     ],
     "security": {
@@ -23,10 +25,21 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "rpm", "msi", "nsis", "app", "dmg"],
+    "category": "DeveloperTool",
+    "copyright": "© 2024 Your Name",
+    "deb": {
+      "depends": []
+    },
+    "externalBin": [],
     "icon": [
-      "icons/plexus.png",
-      "icons/plexus.ico"
-    ]
+      "icons/plexus.png"
+    ],
+    "longDescription": "",
+    "shortDescription": "",
+    "targets": ["deb", "rpm", "appimage"],
+    "linux": {
+      "identifier": "github.hacimertgokhan.plexus",
+      "categories": ["Development"]
+    }
   }
 }
