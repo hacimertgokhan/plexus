@@ -18,9 +18,20 @@ import {
     MenubarSubTrigger,
     MenubarTrigger,
 } from "@/components/ui/menubar";
-import {writeTextFile, readTextFile, readDir} from "@tauri-apps/plugin-fs";
+import {writeTextFile,create, exists, readTextFile, readDir} from "@tauri-apps/plugin-fs";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import {FileIcon, Package2Icon, Code2Icon, SettingsIcon, X, CopyIcon, FolderOpen, FolderClosed} from "lucide-react";
+import {appDataDir, documentDir} from '@tauri-apps/api/path';
+import {
+    FileIcon,
+    Package2Icon,
+    Code2Icon,
+    SettingsIcon,
+    X,
+    CopyIcon,
+    FolderOpen,
+    FolderClosed,
+    TerminalIcon
+} from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import FileExplorer from "@/components/plexus/FileExplorer.jsx";
 import Prism from 'prismjs';
@@ -29,6 +40,7 @@ import 'prismjs/components/prism-python';
 import 'prismjs/themes/prism-tomorrow.css';
 import {SUGGESTIONS} from "@/lib/suggestions.js";
 import {BRACKETS_MAP} from "@/lib/brackets.js";
+import {toast, Toaster} from "react-hot-toast";
 
 const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
     const editorRef = useRef(null);
@@ -326,6 +338,7 @@ const IDE = () => {
         });
     }, [tabs.length]);
 
+
     const languageOptions = useMemo(() =>
             Object.keys(languageExtensions).map(lang => ({
                 value: lang,
@@ -366,6 +379,28 @@ const IDE = () => {
             console.error("Failed to save file:", error);
         }
     }, [tabs]);
+    const createFolder = useCallback(async (folderName) => {
+        try {
+            if (!folderName) return;
+            const baseDirectory = await appDataDir(); // appDataDir() kullanabilirsiniz
+            const folderPath = `${baseDirectory}/${folderName}`;
+            const folderExists = await exists(folderPath);
+            if (folderExists) {
+                console.log(`Folder "${folderName}" created successfully at ${folderPath}`);
+                toast.error("Folder already exists.");
+                return;
+            }
+            await create(folderPath);
+            toast.success("Folder created.");
+            await openSpecifiedFolder(folderPath);
+            console.log(`Folder "${folderName}" created successfully at ${folderPath}`);
+        } catch (error) {
+            toast.error("Folder cannot be created.");
+            console.error("Failed to create folder:", error);
+        }
+    }, [tabs]);
+
+
 
     useEffect(() => {
         if (!autoSaveEnabled) return;
@@ -456,6 +491,32 @@ const IDE = () => {
         }
     }, []);
 
+    const openSpecifiedFolder = useCallback(async (folderPath) => {
+        try {
+            if (!folderPath || typeof folderPath !== 'string' || !folderPath.trim()) {
+                throw new Error("Invalid or empty folder path.");
+            }
+
+            // Klasörü açıyoruz
+            setLoading(true);
+            try {
+                // `readDir` ile klasörün erişilebilir olup olmadığını kontrol ediyoruz
+                await readDir(folderPath);
+                setCurrentFolder(folderPath);  // Klasörü currentFolder olarak ayarlıyoruz
+                setError(''); // Hata varsa temizliyoruz
+                console.log(`Folder opened: ${folderPath}`);
+            } catch (err) {
+                throw new Error(`Selected folder is not accessible: ${err.message}`);
+            } finally {
+                setLoading(false);
+            }
+        } catch (error) {
+            console.error("Failed to open folder:", error);
+            setError(`Failed to open folder: ${error.message}`);
+            setLoading(false);
+        }
+    }, []);
+
     const openFolder = useCallback(async () => {
         try {
             const folderPath = await open({
@@ -525,6 +586,7 @@ const IDE = () => {
 
     return (
         <div className="w-screen h-screen">
+            <Toaster position="bottom-right" />
             <Card className="bg-background w-full h-full border-none">
                 <div className="w-full h-full flex flex-col">
                     <div className="flex border-[1px] items-center sticky w-full justify-between px-4 py-2">
@@ -548,6 +610,9 @@ const IDE = () => {
                                                     </MenubarItem>
                                                 ))}
                                             </MenubarSubContent>
+                                            <MenubarItem onClick={() => {createFolder("plexus")}}>
+                                                Create Folder <MenubarShortcut>⌘+ALT+C</MenubarShortcut>
+                                            </MenubarItem>
                                         </MenubarSub>
                                         <MenubarSeparator/>
                                         <MenubarItem onClick={() => handleSave()}>
@@ -649,6 +714,23 @@ const IDE = () => {
                                     }}
                                 >
                                     <CopyIcon size={16} />
+                                </button>
+                                <button
+                                    className="flex items-center justify-center p-2 rounded-md hover:bg-accent transition-colors"
+                                    title="Open Terminal"
+                                    onClick={() => {
+                                        const handleButtonClick = async () => {
+                                            try {
+                                                await invoke('open_terminal');
+                                            } catch (error) {
+                                                console.error('Terminal açılırken hata oluştu:', error);
+                                            }
+                                        };
+
+                                        handleButtonClick()
+                                    }}
+                                >
+                                    <TerminalIcon size={16} />
                                 </button>
                         </div>
                     </div>

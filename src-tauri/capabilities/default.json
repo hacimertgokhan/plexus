@@ -21,6 +21,26 @@
         },
         {
           "path": "$HOME/*"
+        },
+        {
+          "path": "$DOCUMENTS/*"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-create",
+      "allow": [
+        {
+          "path": "$APPDATA/*"
+        },
+        {
+          "path": "$USERPROFILE/*"
+        },
+        {
+          "path": "$HOME/*"
+        },
+        {
+          "path": "$DOCUMENTS/*"
         }
       ]
     },
@@ -35,6 +55,9 @@
         },
         {
           "path": "$HOME/*"
+        },
+        {
+          "path": "$DOCUMENTS/*"
         }
       ]
     },
