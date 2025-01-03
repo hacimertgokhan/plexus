@@ -25,21 +25,11 @@
   },
   "bundle": {
     "active": true,
-    "category": "DeveloperTool",
-    "copyright": "© 2024 Your Name",
-    "deb": {
-      "depends": []
-    },
-    "externalBin": [],
+    "targets": ["deb", "rpm", "appimage", "msi", "nsis", "app", "dmg"],
+    "publisher": "HacıMertGökhan",
     "icon": [
-      "icons/plexus.png"
-    ],
-    "longDescription": "",
-    "shortDescription": "",
-    "targets": ["deb", "rpm", "appimage"],
-    "linux": {
-      "identifier": "github.hacimertgokhan.plexus",
-      "categories": ["Development"]
-    }
+      "icons/plexus.png",
+      "icons/plexus.ico"
+    ]
   }
 }
