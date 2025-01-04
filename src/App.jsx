@@ -678,13 +678,28 @@ const IDE = () => {
 
                                 <MenubarMenu>
                                     <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1">
-                                        <Code2Icon size={14}/> Plexus</MenubarTrigger>
+                                        <Code2Icon size={14}/> Plexus
+                                    </MenubarTrigger>
                                     <MenubarContent>
                                         <MenubarItem>
-                                            Repository
+                                            <a
+                                                href="https://github.com/hacimertgokhan/plexus"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full h-full"
+                                            >
+                                                Repository
+                                            </a>
                                         </MenubarItem>
                                         <MenubarItem>
-                                            Developers
+                                            <a
+                                                href="https://github.com/hacimertgokhan/plexus/graphs/contributors"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full h-full"
+                                            >
+                                                Developers
+                                            </a>
                                         </MenubarItem>
                                     </MenubarContent>
                                 </MenubarMenu>
