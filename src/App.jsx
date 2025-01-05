@@ -40,7 +40,9 @@ import 'prismjs/components/prism-python';
 import 'prismjs/themes/prism-tomorrow.css';
 import {SUGGESTIONS} from "@/lib/suggestions.js";
 import {BRACKETS_MAP} from "@/lib/brackets.js";
-import {toast, Toaster} from "react-hot-toast";
+import {Toaster} from "@/components/ui/sonner";
+import {toast} from "sonner";
+import ReactMarkdown from 'react-markdown';
 
 const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
     const editorRef = useRef(null);
@@ -214,6 +216,65 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
 
     const fileSize = useMemo(() => new Blob([localValue]).size, [localValue]);
 
+    const isMarkdown = language === 'markdown';
+
+    const MarkdownPreview = ({ content }) => {
+        return (
+            <div className="w-1/2 h-full dark:bg-gray-800 overflow-auto">
+                <div className="p-8">
+                    <article className="prose dark:prose-invert prose-headings:mt-4 prose-headings:mb-4 max-w-none">
+                        <ReactMarkdown
+                            components={{
+                                h1: ({ node, ...props }) => <h1 className="text-4xl font-bold mb-4" {...props} />,
+                                h2: ({ node, ...props }) => <h2 className="text-3xl font-bold mb-3" {...props} />,
+                                h3: ({ node, ...props }) => <h3 className="text-2xl font-bold mb-3" {...props} />,
+                                h4: ({ node, ...props }) => <h4 className="text-xl font-bold mb-2" {...props} />,
+                                h5: ({ node, ...props }) => <h5 className="text-lg font-bold mb-2" {...props} />,
+                                h6: ({ node, ...props }) => <h6 className="text-base font-bold mb-2" {...props} />,
+                                p: ({ node, ...props }) => <p className="mb-4" {...props} />,
+                                ul: ({ node, ...props }) => <ul className="list-disc list-inside mb-4" {...props} />,
+                                ol: ({ node, ...props }) => <ol className="list-decimal list-inside mb-4" {...props} />,
+                                li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                                blockquote: ({ node, ...props }) => (
+                                    <blockquote className="border-l-4 border-gray-300 pl-4 italic mb-4" {...props} />
+                                ),
+                                code: ({ node, inline, ...props }) =>
+                                    inline ? (
+                                        <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded" {...props} />
+                                    ) : (
+                                        <code className="block bg-gray-100 dark:bg-gray-700 p-4 rounded mb-4" {...props} />
+                                    ),
+                                pre: ({ node, ...props }) => (
+                                    <pre className="bg-gray-100 dark:bg-gray-700 p-4 rounded mb-4 overflow-x-auto" {...props} />
+                                ),
+                                a: ({ node, ...props }) => (
+                                    <a className="text-blue-500 hover:text-blue-600 underline" {...props} />
+                                ),
+                                strong: ({ node, ...props }) => <strong className="font-bold" {...props} />,
+                                em: ({ node, ...props }) => <em className="italic" {...props} />,
+                                hr: () => <hr className="my-8 border-gray-300 dark:border-gray-600" />,
+                                img: ({ node, ...props }) => (
+                                    <img className="max-w-full h-auto rounded my-4" {...props} alt={props.alt || ''} />
+                                ),
+                                table: ({ node, ...props }) => (
+                                    <table className="min-w-full border border-gray-300 my-4" {...props} />
+                                ),
+                                th: ({ node, ...props }) => (
+                                    <th className="border border-gray-300 px-4 py-2 bg-gray-100" {...props} />
+                                ),
+                                td: ({ node, ...props }) => (
+                                    <td className="border border-gray-300 px-4 py-2" {...props} />
+                                ),
+                            }}
+                        >
+                            {content}
+                        </ReactMarkdown>
+                    </article>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="w-full h-full rounded-lg overflow-hidden border relative font-mono">
             <div className="p-2 text-sm flex items-center gap-2 w-full border-b">
@@ -222,8 +283,9 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
                 <span>{fileSize}<sup>bytes</sup></span> |
                 <span>{lineNumbers.length}<sup>line</sup></span>
             </div>
-            <div className="w-full  h-[1000px] flex">
-                <div className="relative flex-grow overflow-auto">
+            <div className="w-full h-[1000px] flex">
+                {/* Editor bölümü */}
+                <div className={`relative ${isMarkdown ? 'w-1/2 border-r' : 'w-full'} overflow-auto`}>
                     <textarea
                         ref={editorRef}
                         value={localValue}
@@ -256,30 +318,31 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
                             dangerouslySetInnerHTML={{__html: highlightedCode}}
                         />
                     </pre>
-
-                    {showSuggestions && (
-                        <div
-                            className="absolute z-20 translate-y-7 bg-[#101010] border rounded-[6px] shadow-lg"
-                            style={{
-                                top: suggestionPosition.top,
-                                left: suggestionPosition.left - 10,
-                            }}
-                        >
-                            {suggestions.map((suggestion, index) => (
-                                <div
-                                    key={index}
-                                    className="px-4 py-2 transition-all hover:text-orange-200 hover:bg-[#202020] cursor-pointer"
-                                    onClick={() => handleSuggestionSelect(suggestion)}
-                                >
-                                    {suggestion}
-                                </div>
-                            ))}
-                        </div>
-                    )}
                 </div>
+
+                {isMarkdown && <MarkdownPreview content={localValue} />}
+
+                {showSuggestions && (
+                    <div
+                        className="absolute z-20 translate-y-7 bg-[#101010] border rounded-[6px] shadow-lg"
+                        style={{
+                            top: suggestionPosition.top,
+                            left: suggestionPosition.left - 10,
+                        }}
+                    >
+                        {suggestions.map((suggestion, index) => (
+                            <div
+                                key={index}
+                                className="px-4 py-2 transition-all hover:text-orange-200 hover:bg-[#202020] cursor-pointer"
+                                onClick={() => handleSuggestionSelect(suggestion)}
+                            >
+                                {suggestion}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
-        </div>
-    );
+        </div>);
 });
 
 CodeEditor.displayName = 'CodeEditor';
@@ -294,6 +357,7 @@ const languageExtensions = {
     'css': 'css',
     'rust': 'rs',
     'go': 'go',
+    'markdown': 'md',
 };
 
 const IDE = () => {
@@ -586,7 +650,7 @@ const IDE = () => {
 
     return (
         <div className="w-screen h-screen">
-            <Toaster position="bottom-right" />
+            <Toaster/>
             <Card className="bg-background w-full h-full border-none">
                 <div className="w-full h-full flex flex-col">
                     <div className="flex border-[1px] items-center sticky w-full justify-between px-4 py-2">
@@ -667,7 +731,12 @@ const IDE = () => {
                                         <MenubarSub>
                                             <MenubarSubTrigger>Layout</MenubarSubTrigger>
                                             <MenubarSubContent>
-                                                <MenubarItem onClick={() => setFolderSection(!folderSection)} className={"flex flex-row items-center justify-center gap-1"}>{folderSection === true ? <FolderOpen size={14}/> : <FolderClosed size={14}/>} Folder Section</MenubarItem>
+                                                <MenubarItem onClick={() => {
+                                                    setFolderSection(!folderSection)
+                                                    toast(`Folder section ${folderSection === true ? "enabled" : "disabled"}.`, {
+                                                        description: `${new Date().toLocaleTimeString().toLocaleString()}`,
+                                                    })
+                                                }} className={"flex flex-row items-center justify-center gap-1"}>{folderSection === true ? <FolderOpen size={14}/> : <FolderClosed size={14}/>} Folder Section</MenubarItem>
                                             </MenubarSubContent>
                                         </MenubarSub>
                                         <MenubarItem>
@@ -726,6 +795,9 @@ const IDE = () => {
                                     title="Copy Code"
                                     onClick={() => {
                                         navigator.clipboard.writeText(activeTabData?.content || "")
+                                        toast(`${activeTabData.name} content copied.`, {
+                                            description: `${new Date().toLocaleTimeString().toLocaleString()}`,
+                                        })
                                     }}
                                 >
                                     <CopyIcon size={16} />

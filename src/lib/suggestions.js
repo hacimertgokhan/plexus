@@ -70,6 +70,76 @@ export const SUGGESTIONS = {
         'abstract': ['public abstract class ClassName { abstract void methodName(); }'],
         'package': ['package packageName;']
     },
+    markdown: {
+        'head': [
+            '# Başlık 1',
+            '## Başlık 2',
+            '### Başlık 3',
+            '#### Başlık 4',
+            '##### Başlık 5',
+            '###### Başlık 6'
+        ],
+        'list': [
+            '- Liste öğesi',
+            '1. Numaralı liste',
+            '* Yıldızlı liste',
+            '+ Artılı liste'
+        ],
+        'format': [
+            '**Kalın metin**',
+            '*İtalik metin*',
+            '***Kalın ve italik***',
+            '~~Üstü çizili~~',
+            '`Kod parçası`'
+        ],
+        'link': [
+            '[Link metni](URL)',
+            '![Resim açıklaması](resim-url)',
+            '[Link metni](URL "Tooltip text")',
+            '<URL>'
+        ],
+        'table': [
+            '| Başlık 1 | Başlık 2 |\n|-----------|----------|\n| İçerik 1  | İçerik 2 |',
+            '| Sol | Orta | Sağ |\n|:---|:---:|---:|'
+        ],
+        'code': [
+            '```\nKod bloğu\n```',
+            '```javascript\nJavaScript kod bloğu\n```',
+            '```python\nPython kod bloğu\n```',
+            '```java\nJava kod bloğu\n```'
+        ],
+        'quote': [
+            '> Alıntı metni',
+            '>> İç içe alıntı',
+            '> - Alıntı içinde liste'
+        ],
+        'line': [
+            '---',
+            '***',
+            '___'
+        ],
+        'checkbox': [
+            '- [ ] Yapılacak görev',
+            '- [x] Tamamlanmış görev'
+        ],
+        'escape': [
+            '\\* Yıldız',
+            '\\# Diyez',
+            '\\[ Köşeli parantez',
+            '\\( Parantez'
+        ],
+        'footnote': [
+            '[^1]: Dipnot açıklaması',
+            'Metin içinde dipnot[^1]'
+        ],
+        'definition': [
+            'Terim\n: Tanım',
+            '[Terim]: Tanım'
+        ],
+        'abbreviation': [
+            '*[Kısaltma]: Açıklama'
+        ]
+    },
     rust: {
         'func': ['func functionName() {}', 'func functionName(param Type) Type {}', 'func (r ReceiverType) methodName() {}'],
         'if': ['if condition {}', 'if condition {} else {}', 'if condition1 {} else if condition2 {} else {}'],
