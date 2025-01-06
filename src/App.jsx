@@ -603,6 +603,7 @@ const IDE = () => {
             try {
                 await readDir(folderPath);
                 setCurrentFolder(folderPath);
+                setFolderSection(true)
                 console.log(folderPath)
                 setError('');
             } catch (err) {
@@ -831,6 +832,7 @@ const IDE = () => {
                                             currentFolder={currentFolder}
                                             onFileSelect={handleFileSelect}
                                             setActiveTab={setActiveTab}
+                                            setFolderSection={setFolderSection}
                                         />
                                     )
                                 }

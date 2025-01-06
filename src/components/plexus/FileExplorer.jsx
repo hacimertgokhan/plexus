@@ -114,7 +114,7 @@ const FileIcon = ({ filename }) => {
     );
 };
 
-const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
+const FileExplorer = ({ setFolderSection, onFileSelect, LoadTabs, currentFolder }) => {
     const [tree, setTree] = useState({ files: [], folders: [] });
     const [expandedFolders, setExpandedFolders] = useState(new Set());
     const [currentPath, setCurrentPath] = useState('');
@@ -127,45 +127,6 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-
-    const openFolder = useCallback(async () => {
-        try {
-            const folderPath = await open({
-                directory: true,
-                multiple: false,
-                defaultPath: currentFolder || undefined
-            });
-
-            if (!folderPath) {
-                console.log("Folder selection cancelled");
-                return;
-            }
-
-            if (typeof folderPath !== 'string') {
-                throw new Error("Invalid folder path type");
-            }
-
-            if (!folderPath.trim()) {
-                throw new Error("Empty folder path");
-            }
-
-            setLoading(true);
-            try {
-                const entries = await readDir(folderPath);
-                setCurrentFolder(folderPath);
-                setError('');
-            } catch (err) {
-                throw new Error(`Selected folder is not accessible: ${err.message}`);
-            } finally {
-                setLoading(false);
-            }
-
-        } catch (error) {
-            console.error("Failed to open folder:", error);
-            setError(`Failed to open folder: ${error.message}`);
-            setLoading(false);
-        }
-    }, [currentFolder]);
 
     useEffect(() => {
         if (currentFolder) {
