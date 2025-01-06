@@ -43,6 +43,7 @@ import {BRACKETS_MAP} from "@/lib/brackets.js";
 import {Toaster} from "@/components/ui/sonner";
 import {toast} from "sonner";
 import ReactMarkdown from 'react-markdown';
+import SpotifyPlayer from "@/components/plexus/features/Spotify.jsx";
 
 const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
     const editorRef = useRef(null);
@@ -867,6 +868,9 @@ const IDE = () => {
 
                 </div>
             </Card>
+            <div className={"fixed bottom-0 right-0 z-[500]"}>
+                <SpotifyPlayer/>
+            </div>
         </div>
     );
 };

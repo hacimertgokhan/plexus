@@ -20,7 +20,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' https://*.spotify.com 'unsafe-inline' 'unsafe-eval'; script-src 'self' https://*.spotify.com 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://*.spotify.com"
     }
   },
   "bundle": {
