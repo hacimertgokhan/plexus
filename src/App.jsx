@@ -733,7 +733,7 @@ const IDE = () => {
                                             <MenubarSubContent>
                                                 <MenubarItem onClick={() => {
                                                     setFolderSection(!folderSection)
-                                                    toast(`Folder section ${folderSection === true ? "enabled" : "disabled"}.`, {
+                                                    toast(`Folder section ${folderSection === true ? "disabled" : "enabled"}.`, {
                                                         description: `${new Date().toLocaleTimeString().toLocaleString()}`,
                                                     })
                                                 }} className={"flex flex-row items-center justify-center gap-1"}>{folderSection === true ? <FolderOpen size={14}/> : <FolderClosed size={14}/>} Folder Section</MenubarItem>

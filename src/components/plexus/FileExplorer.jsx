@@ -1,5 +1,5 @@
 import {ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger} from "@/components/ui/context-menu";
-import {FileIcon, FolderIcon} from "lucide-react";
+import {FolderIcon} from "lucide-react";
 import React, { useState, useEffect, useCallback } from 'react';
 import { writeTextFile, readTextFile, readDir, create, remove } from "@tauri-apps/plugin-fs";
 import {Button} from "@/components/ui/button";
@@ -8,6 +8,111 @@ import {Input} from "@/components/ui/input";
 import * as pathModule from "@tauri-apps/api/path";
 import { normalize, appDataDir } from '@tauri-apps/api/path';
 import { open } from '@tauri-apps/plugin-dialog';
+import { Icon } from '@iconify/react';
+const getFileIconName = (filename) => {
+    const extension = filename.split('.').pop().toLowerCase();
+
+    // Yaygın dosya türleri için icon eşleştirmeleri
+    const iconMappings = {
+        // Programlama Dilleri
+        js: 'logos:javascript',
+        ts: 'logos:typescript-icon',
+        jsx: 'logos:react',
+        tsx: 'logos:react',
+        py: 'logos:python',
+        java: 'logos:java',
+        cpp: 'logos:c-plusplus',
+        cs: 'logos:c-sharp',
+        go: 'logos:go',
+        rs: 'logos:rust',
+
+        // Web Teknolojileri
+        html: 'logos:html-5',
+        css: 'logos:css-3',
+        scss: 'logos:sass',
+        less: 'logos:less',
+
+        // Veri & Konfigürasyon
+        json: 'vscode-icons:file-type-json',
+        yaml: 'vscode-icons:file-type-yaml',
+        yml: 'vscode-icons:file-type-yaml',
+        xml: 'vscode-icons:file-type-xml',
+        sql: 'vscode-icons:file-type-sql',
+
+        // Markdown & Dökümantasyon
+        md: 'vscode-icons:file-type-markdown',
+        pdf: 'vscode-icons:file-type-pdf',
+        doc: 'vscode-icons:file-type-word',
+        docx: 'vscode-icons:file-type-word',
+
+        // Medya
+        jpg: 'vscode-icons:file-type-image',
+        jpeg: 'vscode-icons:file-type-image',
+        png: 'vscode-icons:file-type-image',
+        gif: 'vscode-icons:file-type-image',
+        svg: 'vscode-icons:file-type-svg',
+
+        // Diğer
+        env: 'vscode-icons:file-type-env',
+        zip: 'vscode-icons:file-type-zip',
+        rar: 'vscode-icons:file-type-zip',
+        txt: 'vscode-icons:file-type-text',
+        log: 'vscode-icons:file-type-log'
+    };
+
+    return iconMappings[extension] || 'vscode-icons:default-file';
+};
+const fileTypeStyles = {
+    // Programlama Dilleri
+    js: { color: '#ffeb3b', hoverBg: 'rgba(255, 235, 59, 0.2)' },
+    ts: { color: '#4fc3f7', hoverBg: 'rgba(79, 195, 247, 0.2)' },
+    jsx: { color: '#80deea', hoverBg: 'rgba(128, 222, 234, 0.2)' },
+    tsx: { color: '#4fc3f7', hoverBg: 'rgba(79, 195, 247, 0.2)' },
+    py: { color: '#64b5f6', hoverBg: 'rgba(100, 181, 246, 0.2)' },
+    java: { color: '#64b5f6', hoverBg: 'rgba(100, 181, 246, 0.2)' },
+    cpp: { color: '#90caf9', hoverBg: 'rgba(144, 202, 249, 0.2)' },
+    rs: { color: '#ffcc80', hoverBg: 'rgba(255, 204, 128, 0.2)' },
+    go: { color: '#81d4fa', hoverBg: 'rgba(129, 212, 250, 0.2)' },
+
+    // Web Teknolojileri
+    html: { color: '#ef5350', hoverBg: 'rgba(239, 83, 80, 0.2)' },
+    css: { color: '#42a5f5', hoverBg: 'rgba(66, 165, 245, 0.2)' },
+    scss: { color: '#f06292', hoverBg: 'rgba(240, 98, 146, 0.2)' },
+    less: { color: '#78909c', hoverBg: 'rgba(120, 144, 156, 0.2)' },
+
+    // Veri & Konfigürasyon
+    json: { color: '#cfd8dc', hoverBg: 'rgba(207, 216, 220, 0.2)' },
+    yaml: { color: '#ff8a80', hoverBg: 'rgba(255, 138, 128, 0.2)' },
+    xml: { color: '#80deea', hoverBg: 'rgba(128, 222, 234, 0.2)' },
+    sql: { color: '#7986cb', hoverBg: 'rgba(121, 134, 203, 0.2)' },
+
+    // Markdown & Dökümantasyon
+    md: { color: '#2196f3', hoverBg: 'rgba(33, 150, 243, 0.2)' },
+    pdf: { color: '#ff5252', hoverBg: 'rgba(255, 82, 82, 0.2)' },
+    doc: { color: '#7986cb', hoverBg: 'rgba(121, 134, 203, 0.2)' },
+    docx: { color: '#7986cb', hoverBg: 'rgba(121, 134, 203, 0.2)' },
+
+    // Medya
+    jpg: { color: '#7986cb', hoverBg: 'rgba(121, 134, 203, 0.2)' },
+    jpeg: { color: '#7986cb', hoverBg: 'rgba(121, 134, 203, 0.2)' },
+    png: { color: '#7986cb', hoverBg: 'rgba(121, 134, 203, 0.2)' },
+    gif: { color: '#7986cb', hoverBg: 'rgba(121, 134, 203, 0.2)' },
+    svg: { color: '#ffa726', hoverBg: 'rgba(255, 167, 38, 0.2)' },
+
+    // Varsayılan
+    default: { color: '#cfd8dc', hoverBg: 'rgba(207, 216, 220, 0.2)' }
+};
+
+const FileIcon = ({ filename }) => {
+    const extension = filename.split('.').pop().toLowerCase();
+    const style = fileTypeStyles[extension] || fileTypeStyles.default;
+
+    return (
+        <div className="flex items-center" style={{ color: style.color }}>
+            <Icon color={style.color} icon={getFileIconName(filename)} width="16" height="16" />
+        </div>
+    );
+};
 
 const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
     const [tree, setTree] = useState({ files: [], folders: [] });
@@ -288,11 +393,14 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
                         <ContextMenu>
                             <ContextMenuTrigger>
                                 <div
-                                    className="flex items-center gap-2 hover:bg-accent p-1 rounded cursor-pointer"
+                                    className="flex items-center gap-2 p-1 rounded cursor-pointer transition-colors duration-200"
+                                    style={{
+                                        '--hover-bg': 'rgba(253, 224, 71, 0.1)'
+                                    }}
                                     onClick={() => toggleFolder(folder.path)}
                                 >
-                                    <FolderIcon size={16} />
-                                    <span>{folder.name}</span>
+                                    <FolderIcon size={16} className="text-yellow-500" />
+                                    <span className="text-yellow-700">{folder.name}</span>
                                 </div>
                             </ContextMenuTrigger>
                             <ContextMenuContent>
@@ -306,26 +414,40 @@ const FileExplorer = ({ onFileSelect, LoadTabs, currentFolder }) => {
                         )}
                     </div>
                 ))}
-                {items.files.map(file => (
-                    <ContextMenu key={file.path}>
-                        <ContextMenuTrigger>
-                            <div
-                                className="flex items-center gap-2 hover:bg-accent p-1 rounded cursor-pointer pl-6"
-                                onClick={() => {
-                                    onFileSelect(file.path, file.language)
-                                    LoadTabs(file.name, file.content, file.path);
-                                }}
-                            >
-                                <FileIcon size={16} />
-                                <span>{file.name}</span>
-                            </div>
-                        </ContextMenuTrigger>
-                        <ContextMenuContent>
-                            <ContextMenuItem onClick={() => deleteFile(file.path)}>Delete</ContextMenuItem>
-                            <ContextMenuItem onClick={() => renameFile(file.path)}>Rename</ContextMenuItem>
-                        </ContextMenuContent>
-                    </ContextMenu>
-                ))}
+                {items.files.map(file => {
+                    const extension = file.name.split('.').pop().toLowerCase();
+                    const style = fileTypeStyles[extension] || fileTypeStyles.default;
+
+                    return (
+                        <ContextMenu key={file.path}>
+                            <ContextMenuTrigger>
+                                <div
+                                    className="flex items-center gap-2 p-1 rounded cursor-pointer pl-6 transition-colors duration-200"
+                                    style={{
+                                        '--hover-bg': style.hoverBg,
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor = style.hoverBg;
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor = 'transparent';
+                                    }}
+                                    onClick={() => {
+                                        onFileSelect(file.path, file.language)
+                                        LoadTabs(file.name, file.content, file.path);
+                                    }}
+                                >
+                                    <FileIcon filename={file.name} />
+                                    <span style={{ color: style.color }}>{file.name}</span>
+                                </div>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                                <ContextMenuItem onClick={() => deleteFile(file.path)}>Delete</ContextMenuItem>
+                                <ContextMenuItem onClick={() => renameFile(file.path)}>Rename</ContextMenuItem>
+                            </ContextMenuContent>
+                        </ContextMenu>
+                    );
+                })}
             </div>
         );
     };
