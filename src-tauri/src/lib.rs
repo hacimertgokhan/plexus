@@ -6,7 +6,7 @@ fn create_project_command(framework: String) -> Result<String, String> {
         "Next" => "npx create-next-app@latest my-next-project",
         "React" => "npx create-react-app my-react-app",
         "Angular" => "npx @angular/cli new my-angular-app",
-        "HTML" => "mkdir my-html-project && touch index.html",  // HTML project creation
+        "HTML" => "mkdir my-html-project && touch index.html", // HTML project creation
         _ => return Err("Framework not supported".to_string()),
     };
 
@@ -46,11 +46,10 @@ fn open_terminal() -> Result<(), String> {
     Ok(())
 }
 
-
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())

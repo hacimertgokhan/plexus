@@ -21,3 +21,4 @@ tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-fs = { version = "2.2.0", features = ["watch"] }
 tauri-plugin-os = "2"
+tauri-plugin-http = "2"

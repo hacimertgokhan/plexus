@@ -11,6 +11,10 @@
     "dialog:default",
     "fs:default",
     {
+      "identifier": "http:default",
+      "allow": [{ "url": "https://api.spotify.com" }]
+    },
+    {
       "identifier": "fs:allow-exists",
       "allow": [
         {
@@ -62,6 +66,7 @@
       ]
     },
     "shell:default",
-    "os:default"
+    "os:default",
+    "http:default"
   ]
 }

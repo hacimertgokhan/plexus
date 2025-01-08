@@ -30,7 +30,7 @@ import {
     CopyIcon,
     FolderOpen,
     FolderClosed,
-    TerminalIcon
+    TerminalIcon, PlayIcon
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import FileExplorer from "@/components/plexus/FileExplorer.jsx";
@@ -43,7 +43,8 @@ import {BRACKETS_MAP} from "@/lib/brackets.js";
 import {Toaster} from "@/components/ui/sonner";
 import {toast} from "sonner";
 import ReactMarkdown from 'react-markdown';
-import SpotifyPlayer from "@/components/plexus/features/Spotify.jsx";
+import SpotifyPlayer from "@/components/plexus/features/SpotifyPlayer.jsx";
+import Spotify from "@/components/plexus/features/Spotify.jsx";
 
 const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
     const editorRef = useRef(null);
@@ -370,6 +371,7 @@ const IDE = () => {
     const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
     const [currentFolder, setCurrentFolder] = useState(null);
     const [folderSection, setFolderSection] = useState(false);
+    const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const activeTabData = useMemo(() =>
@@ -776,7 +778,7 @@ const IDE = () => {
                                 </MenubarMenu>
                             </Menubar>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex relative items-center gap-2">
                             <Select
                                 value={tabs.find(tab => tab.id === activeTab)?.language}
                                 onValueChange={updateTabLanguage}
@@ -792,35 +794,43 @@ const IDE = () => {
                                     ))}
                                 </SelectContent>
                             </Select>
-                                <button
-                                    className="flex items-center justify-center p-2 rounded-md hover:bg-accent transition-colors"
-                                    title="Copy Code"
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(activeTabData?.content || "")
-                                        toast(`${activeTabData.name} content copied.`, {
-                                            description: `${new Date().toLocaleTimeString().toLocaleString()}`,
-                                        })
-                                    }}
-                                >
-                                    <CopyIcon size={16} />
-                                </button>
-                                <button
-                                    className="flex items-center justify-center p-2 rounded-md hover:bg-accent transition-colors"
-                                    title="Open Terminal"
-                                    onClick={() => {
-                                        const handleButtonClick = async () => {
-                                            try {
-                                                await invoke('open_terminal');
-                                            } catch (error) {
-                                                console.error('Terminal açılırken hata oluştu:', error);
-                                            }
-                                        };
+                            <button
+                                className="flex items-center justify-center p-2 rounded-md hover:bg-accent transition-colors"
+                                title="Copy Code"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(activeTabData?.content || "")
+                                    toast(`${activeTabData.name} content copied.`, {
+                                        description: `${new Date().toLocaleTimeString().toLocaleString()}`,
+                                    })
+                                }}
+                            >
+                                <CopyIcon size={16}/>
+                            </button>
+                            <button
+                                className="flex items-center justify-center p-2 rounded-md hover:bg-accent transition-colors"
+                                title="Open Terminal"
+                                onClick={() => {
+                                    const handleButtonClick = async () => {
+                                        try {
+                                            await invoke('open_terminal');
+                                        } catch (error) {
+                                            console.error('Terminal açılırken hata oluştu:', error);
+                                        }
+                                    };
 
-                                        handleButtonClick()
-                                    }}
-                                >
-                                    <TerminalIcon size={16} />
-                                </button>
+                                    handleButtonClick()
+                                }}
+                            >
+                                <TerminalIcon size={16}/>
+                            </button>
+                            <button
+                                className="flex items-center justify-center p-2 rounded-md hover:bg-accent transition-colors"
+                                onClick={() => {
+                                    setIsOpen(!isOpen);
+                                }}
+                            >
+                                <PlayIcon size={16}/>
+                            </button>
                         </div>
                     </div>
                     <div className="flex w-full h-full flex-row">
@@ -869,7 +879,7 @@ const IDE = () => {
                 </div>
             </Card>
             <div className={"fixed bottom-0 right-0 z-[500]"}>
-                <SpotifyPlayer/>
+                <Spotify setIsOpen={setIsOpen} isOpen={isOpen}/>
             </div>
         </div>
     );
