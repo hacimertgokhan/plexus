@@ -36,6 +36,134 @@ export const SUGGESTIONS = {
         'command': ['use std::process::Command;', 'Command::new("command").arg("arg").spawn()?;'],
         'env': ['use std::env;', 'let var = env::var("VAR_NAME")?;', 'env::set_var("VAR_NAME", "value");']
     },
+    php: {
+        'function': [
+            'function functionName() { // code }',
+            'function functionName($param) { // code }',
+            'function functionName($param1, $param2): ReturnType { // code }'
+        ],
+        'if': [
+            'if ($condition) { // code }',
+            'if ($condition) { // code } else { // code }',
+            'if ($condition1) { // code } elseif ($condition2) { // code } else { // code }'
+        ],
+        'for': [
+            'for ($i = 0; $i < $length; $i++) { // code }',
+            'foreach ($array as $item) { // code }',
+            'foreach ($array as $key => $value) { // code }'
+        ],
+        'while': [
+            'while ($condition) { // code }',
+            'do { // code } while ($condition);'
+        ],
+        'switch': [
+            'switch ($variable) { case "value": // code; break; default: // code; }'
+        ],
+        'class': [
+            'class ClassName { public function method() { // code } }',
+            'class ClassName extends ParentClass { // code }',
+            'class ClassName implements InterfaceName { // code }'
+        ],
+        'interface': [
+            'interface InterfaceName { public function method(); }',
+            'class ClassName implements InterfaceName { public function method() { // code } }'
+        ],
+        'trait': [
+            'trait TraitName { public function method() { // code } }',
+            'class ClassName { use TraitName; }'
+        ],
+        'namespace': [
+            'namespace NamespaceName;',
+            'use NamespaceName\\ClassName;',
+            'use function NamespaceName\\functionName;'
+        ],
+        'array': [
+            '$array = [];',
+            '$array = [key => value];',
+            '$array[] = value;',
+            'foreach ($array as $item) { // code }'
+        ],
+        'string': [
+            '$string = "text";',
+            '$string = \'text\';',
+            '$string = <<<EOT\nmultiline string\nEOT;'
+        ],
+        'echo': [
+            'echo "text";',
+            'echo $variable;',
+            'echo "text: $variable";'
+        ],
+        'print': [
+            'print("text");',
+            'print($variable);'
+        ],
+        'require': [
+            'require "file.php";',
+            'require_once "file.php";'
+        ],
+        'include': [
+            'include "file.php";',
+            'include_once "file.php";'
+        ],
+        'file': [
+            '$file = fopen("file.txt", "r");',
+            '$contents = file_get_contents("file.txt");',
+            'file_put_contents("file.txt", $data);'
+        ],
+        'json': [
+            '$json = json_encode($array);',
+            '$array = json_decode($json, true);'
+        ],
+        'session': [
+            'session_start();',
+            '$_SESSION["key"] = "value";',
+            'unset($_SESSION["key"]);'
+        ],
+        'cookie': [
+            'setcookie("name", "value", time() + 3600);',
+            '$_COOKIE["name"];',
+            'setcookie("name", "", time() - 3600);'
+        ],
+        'http': [
+            'header("Content-Type: application/json");',
+            'header("Location: /path/to/page");'
+        ],
+        'pdo': [
+            '$pdo = new PDO($dsn, $username, $password);',
+            '$stmt = $pdo->prepare("SELECT * FROM table WHERE id = :id");',
+            '$stmt->execute([":id" => $id]);'
+        ],
+        'mysqli': [
+            '$mysqli = new mysqli($host, $username, $password, $dbname);',
+            '$result = $mysqli->query("SELECT * FROM table");',
+            'while ($row = $result->fetch_assoc()) { // code }'
+        ],
+        'error': [
+            'try { // code } catch (Exception $e) { echo $e->getMessage(); }',
+            'throw new Exception("Error message");'
+        ],
+        'date': [
+            '$date = date("Y-m-d H:i:s");',
+            '$timestamp = strtotime($dateString);'
+        ],
+        'env': [
+            'putenv("VAR_NAME=value");',
+            '$value = getenv("VAR_NAME");'
+        ],
+        'composer': [
+            'composer require package/name',
+            'composer install',
+            'composer update'
+        ],
+        'cli': [
+            '$argv[0]; // Script name',
+            'foreach ($argv as $arg) { // code }'
+        ],
+        'process': [
+            'exec("command", $output, $returnVar);',
+            'shell_exec("command");'
+        ]
+    },
     java: {
         'func': ['void functionName() {}', 'int functionName() { return 0; }', 'String functionName() { return ""; }'],
         'if': ['if (condition) {}', 'if (condition) {} else {}', 'if (condition1) {} else if (condition2) {} else {}'],

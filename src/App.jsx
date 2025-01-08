@@ -360,6 +360,7 @@ const languageExtensions = {
     'rust': 'rs',
     'go': 'go',
     'markdown': 'md',
+    'php': 'php',
 };
 
 const IDE = () => {
