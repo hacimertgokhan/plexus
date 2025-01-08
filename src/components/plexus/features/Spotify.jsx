@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {setAccessToken} from "@/components/plexus/services/spotifyService.js";
 import SpotifyPlayer from "@/components/plexus/features/SpotifyPlayer.jsx";
-import {toast} from "sonner";
 import {PlayIcon, XIcon} from "lucide-react";
-import SpotifyPlaylists from "@/components/plexus/features/SpotifyPlaylists.jsx";
 
 function Spotify({isOpen,setIsOpen}) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
