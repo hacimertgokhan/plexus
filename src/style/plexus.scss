@@ -1,0 +1,36 @@
+.plexus_dropdown {
+    width: 50px;
+    height: 25px;
+    display: flex;
+    place-items: center;
+    justify-content: center;
+    margin-left: 9px;
+    button {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 3px;
+        justify-content: center;
+        font-size: 0.875rem /* 14px */;     line-height: 1.25rem /* 20px */;
+    }
+}
+
+.plexus_dropdown_container {
+    width: 200px;
+    height: fit-content;
+    padding: 6px;
+    margin-top: 12px;
+    border-radius: 4px;
+    border-color: #202020;
+    z-index: 500;
+    border-width: 1px;
+    background-color: #10101b;
+    position: relative;
+    div {
+        cursor: pointer;
+        width: 100%;
+        &:hover {
+            background-color: #202020;
+        }
+    }
+}

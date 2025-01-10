@@ -45,6 +45,7 @@ import {toast} from "sonner";
 import ReactMarkdown from 'react-markdown';
 import SpotifyPlayer from "@/components/plexus/features/SpotifyPlayer.jsx";
 import Spotify from "@/components/plexus/features/Spotify.jsx";
+import Dropdown from "@/components/plexus/ui/Dropdown.jsx";
 
 const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
     const editorRef = useRef(null);
@@ -660,7 +661,7 @@ const IDE = () => {
                 <div className="w-full h-full flex flex-col">
                     <div className="flex border-[1px] items-center sticky w-full justify-between px-4 py-2">
                         <div className="flex items-center -ml-3 h-[20px] flex-row justify-start">
-                            <Menubar className="shadow-none border-none">
+                            <Menubar className="shadow-none border-none mr-2">
                                 <MenubarMenu>
                                     <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1"><FileIcon size={14}/> File</MenubarTrigger>
                                     <MenubarContent>
