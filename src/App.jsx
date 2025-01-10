@@ -216,8 +216,6 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
     const handleChange = useCallback((e) => {
         const newValue = e.target.value;
         onChange(newValue);
-        debouncedQuickCheck(newValue);
-        debouncedFullCheck(newValue);
         setLocalValue(newValue);
 
         const lines = newValue.split('\n');
