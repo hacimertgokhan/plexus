@@ -30,7 +30,7 @@ import {
     CopyIcon,
     FolderOpen,
     FolderClosed,
-    TerminalIcon, PlayIcon
+    TerminalIcon, PlayIcon, SaveIcon, RefreshCwIcon
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import FileExplorer from "@/components/plexus/FileExplorer.jsx";
@@ -45,6 +45,7 @@ import {toast} from "sonner";
 import ReactMarkdown from 'react-markdown';
 import Spotify from "@/components/plexus/features/Spotify.jsx";
 import {debounce} from "lodash";
+import Dropdown from "@/components/plexus/ui/Dropdown.jsx";
 
 const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
     const editorRef = useRef(null);
@@ -858,125 +859,31 @@ const IDE = () => {
             <Card className="bg-background w-full h-full border-none">
                 <div className="w-full h-full flex flex-col">
                     <div className="flex border-[1px] items-center sticky w-full justify-between px-4 py-2">
-                        <div className="flex items-center -ml-3 h-[20px] flex-row justify-start">
-                            <Menubar className="shadow-none border-none mr-2">
-                                <MenubarMenu>
-                                    <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1"><FileIcon size={14}/> File</MenubarTrigger>
-                                    <MenubarContent>
-                                        <MenubarSub>
-                                            <MenubarItem onClick={openFile}>
-                                                Open File <MenubarShortcut>⌘+Alt+A</MenubarShortcut>
-                                            </MenubarItem>
-                                            <MenubarItem onClick={openFolder}>
-                                                Open Folder <MenubarShortcut>⌘+K</MenubarShortcut>
-                                            </MenubarItem>
-                                            <MenubarSubTrigger>New File</MenubarSubTrigger>
-                                            <MenubarSubContent>
-                                                {Object.keys(languageExtensions).map(lang => (
-                                                    <MenubarItem key={lang} onClick={() => createNewTab(lang)}>
-                                                        {lang.charAt(0).toUpperCase() + lang.slice(1)}
-                                                    </MenubarItem>
-                                                ))}
-                                            </MenubarSubContent>
-                                            <MenubarItem onClick={() => {createFolder("plexus")}}>
-                                                Create Folder <MenubarShortcut>⌘+ALT+C</MenubarShortcut>
-                                            </MenubarItem>
-                                        </MenubarSub>
-                                        <MenubarSeparator/>
-                                        <MenubarItem onClick={() => handleSave()}>
-                                            Save <MenubarShortcut>⌘S</MenubarShortcut>
-                                        </MenubarItem>
-                                        <MenubarItem onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}>
-                                            {autoSaveEnabled ? 'Disable' : 'Enable'} Auto-save
-                                        </MenubarItem>
-                                    </MenubarContent>
-                                </MenubarMenu>
-                                <MenubarMenu>
-                                    <MenubarTrigger
-                                        className="text-sm flex flex-row items-center justify-center gap-1"><Package2Icon
-                                        size={14}/> Projects</MenubarTrigger>
-                                    <MenubarContent>
-                                        <MenubarSub>
-                                            <MenubarSubTrigger>New Web Project</MenubarSubTrigger>
-                                            <MenubarSubContent>
-                                                <MenubarItem
-                                                    onClick={() => createFrameworkProject('HTML')}>HTML</MenubarItem>
-                                                <MenubarItem
-                                                    onClick={() => createFrameworkProject('Next')}>Next</MenubarItem>
-                                                <MenubarItem
-                                                    onClick={() => createFrameworkProject('React')}>React</MenubarItem>
-                                                <MenubarItem
-                                                    onClick={() => createFrameworkProject('Angular')}>Angular</MenubarItem>
-                                            </MenubarSubContent>
-                                        </MenubarSub>
-                                        <MenubarSub>
-                                            <MenubarSubTrigger>New App Project</MenubarSubTrigger>
-                                            <MenubarSubContent>
-                                                <MenubarItem
-                                                    onClick={() => createFrameworkProject('Tauri')}>Tauri</MenubarItem>
-                                                <MenubarItem
-                                                    onClick={() => createFrameworkProject('Electron')}>Electron</MenubarItem>
-                                                <MenubarItem onClick={() => createFrameworkProject('ReactNative')}>React
-                                                    Native</MenubarItem>
-                                                <MenubarItem
-                                                    onClick={() => createFrameworkProject('Expo')}>Expo</MenubarItem>
-                                            </MenubarSubContent>
-                                        </MenubarSub>
-                                    </MenubarContent>
-                                </MenubarMenu>
+                        <div className="flex items-center gap-2 ml-2 h-[20px] flex-row justify-start">
+                            <div className="flex gap-2 flex-row">
+                                <button onClick={openFile} className="flex items-center gap-1 text-sm">
+                                    <FileIcon size={14}/> Open File
+                                </button>
+                                <button onClick={openFolder} className="flex items-center gap-1 text-sm">
+                                    <FileIcon size={14}/> Open Folder
+                                </button>
+                                <button onClick={() => handleSave()} className="flex items-center gap-1 text-sm">
+                                    <SaveIcon size={14}/> Save
+                                </button>
+                                <button onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
+                                        className="flex items-center gap-1 text-sm">
+                                    <RefreshCwIcon size={14}/> {autoSaveEnabled ? 'Disable' : 'Enable'} Auto-save
+                                </button>
+                            </div>
+                            <div className="flex gap-2 flex-row">
+                                <button onClick={() => {
+                                    setFolderSection(!folderSection);
+                                }} className="flex items-center gap-1 text-sm">
+                                    {folderSection === true ? <FolderOpen size={14}/> :
+                                        <FolderClosed size={14}/>} Folder Section
+                                </button>
+                            </div>
 
-                                <MenubarMenu>
-                                    <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1">
-                                        <SettingsIcon size={14}/> Settings</MenubarTrigger>
-                                    <MenubarContent>
-                                        <MenubarItem>
-                                            Window
-                                        </MenubarItem>
-                                        <MenubarSub>
-                                            <MenubarSubTrigger>Layout</MenubarSubTrigger>
-                                            <MenubarSubContent>
-                                                <MenubarItem onClick={() => {
-                                                    setFolderSection(!folderSection)
-                                                    toast(`Folder section ${folderSection === true ? "disabled" : "enabled"}.`, {
-                                                        description: `${new Date().toLocaleTimeString().toLocaleString()}`,
-                                                    })
-                                                }} className={"flex flex-row items-center justify-center gap-1"}>{folderSection === true ? <FolderOpen size={14}/> : <FolderClosed size={14}/>} Folder Section</MenubarItem>
-                                            </MenubarSubContent>
-                                        </MenubarSub>
-                                        <MenubarItem>
-                                            Optimization
-                                        </MenubarItem>
-                                    </MenubarContent>
-                                </MenubarMenu>
-
-                                <MenubarMenu>
-                                    <MenubarTrigger className="text-sm flex flex-row items-center justify-center gap-1">
-                                        <Code2Icon size={14}/> Plexus
-                                    </MenubarTrigger>
-                                    <MenubarContent>
-                                        <MenubarItem>
-                                            <a
-                                                href="https://github.com/hacimertgokhan/plexus"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="w-full h-full"
-                                            >
-                                                Repository
-                                            </a>
-                                        </MenubarItem>
-                                        <MenubarItem>
-                                            <a
-                                                href="https://github.com/hacimertgokhan/plexus/graphs/contributors"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="w-full h-full"
-                                            >
-                                                Developers
-                                            </a>
-                                        </MenubarItem>
-                                    </MenubarContent>
-                                </MenubarMenu>
-                            </Menubar>
                         </div>
                         <div className="flex relative items-center gap-2">
                             <Select
@@ -1087,7 +994,7 @@ const IDE = () => {
 const Tab = React.memo(({tab, isActive, onActivate, onClose}) => (
     <div
         onClick={onActivate}
-        className={`px-1 text-sm bg-background border-[1px] rounded-md cursor-pointer items-center z-[100] justify-center flex flex-row ${isActive ? 'text-green-500' : ''}`}
+        className={`px-1 text-sm bg-background border-[1px] rounded-md cursor-pointer items-center z-[100] justify-center flex flex-row ${isActive ? 'text-green-200' : ''}`}
     >
         <p className="overflow-hidden text-ellipsis w-[100px]">{tab.name}</p>
         <button
