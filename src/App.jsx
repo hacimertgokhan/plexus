@@ -43,9 +43,8 @@ import {BRACKETS_MAP} from "@/lib/brackets.js";
 import {Toaster} from "@/components/ui/sonner";
 import {toast} from "sonner";
 import ReactMarkdown from 'react-markdown';
-import SpotifyPlayer from "@/components/plexus/features/SpotifyPlayer.jsx";
 import Spotify from "@/components/plexus/features/Spotify.jsx";
-import Dropdown from "@/components/plexus/ui/Dropdown.jsx";
+import {debounce} from "lodash";
 
 const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
     const editorRef = useRef(null);
@@ -53,11 +52,172 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
     const [suggestions, setSuggestions] = useState([]);
     const [suggestionPosition, setSuggestionPosition] = useState({ top: 0, left: 0 });
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [syntaxErrors, setSyntaxErrors] = useState([]);
+    const QUICK_CHECK_DEBOUNCE = 150;
+    const FULL_CHECK_DEBOUNCE = 1000;
+
+    const SYNTAX_RULES = {
+        javascript: {
+            quick: {
+                brackets: {
+                    validate: (code) => {  // line yerine tüm code'u alıyoruz
+                        const stack = [];
+                        const brackets = { '(': ')', '{': '}', '[': ']' };
+                        const errors = [];
+                        let lineNumber = 1;
+                        let columnNumber = 0;
+
+                        for (let i = 0; i < code.length; i++) {
+                            const char = code[i];
+
+                            if (char === '\n') {
+                                lineNumber++;
+                                columnNumber = 0;
+                                continue;
+                            }
+                            columnNumber++;
+
+                            if (brackets[char]) {
+                                stack.push({ char, line: lineNumber, column: columnNumber });
+                            } else if (Object.values(brackets).includes(char)) {
+                                const lastBracket = stack.pop();
+                                if (!lastBracket || brackets[lastBracket.char] !== char) {
+                                    errors.push({
+                                        line: lineNumber,
+                                        column: columnNumber,
+                                        message: `Mismatched bracket: expected '${lastBracket ? brackets[lastBracket.char] : ''}' but found '${char}'`
+                                    });
+                                }
+                            }
+                        }
+
+                        // Kapatılmamış parantezler için hata
+                        stack.forEach(bracket => {
+                            errors.push({
+                                line: bracket.line,
+                                column: bracket.column,
+                                type: "bracket",
+                                message: `Unclosed bracket '${bracket.char}'`
+                            });
+                        });
+
+                        return errors;
+                    }
+                }
+            },
+            full: {
+                functionDeclaration: {
+                    pattern: /function\s+([^(]*)/,
+                    validate: (match) => {
+                        const name = match[1].trim();
+                        return name && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)
+                            ? null
+                            : "Invalid function name";
+                    }
+                },
+                consoleLog: {
+                    pattern: /console\.(log|warn|error|info|debug)\(/,
+                    message: "Consider removing console statements"
+                }
+            }
+        },
+    };
+
+    // Hızlı sözdizimi kontrolü - her yazımda çalışır
+    const quickSyntaxCheck = useCallback((code) => {
+        if (!code.trim()) {
+            setSyntaxErrors([]);
+            return;
+        }
+
+        const currentRules = SYNTAX_RULES[language?.toLowerCase()]?.quick;
+        if (!currentRules) return;
+
+
+        const errors = [];
+        const lines = code.split('\n');
+
+        // Sadece son değişen satırı kontrol et
+        const lastLine = lines.length - 1;
+        const currentLine = lines[lastLine];
+
+        // Bracket kontrolü artık tüm kodu kontrol ediyor
+        if (currentRules.brackets) {
+            errors.push(currentRules.brackets.validate(code));
+        }
+
+        Object.entries(currentRules).forEach(([ruleName, rule]) => {
+            const error = rule.validate(currentLine);
+            if (error) {
+                errors.push({
+                    line: lastLine + 1,
+                    message: error,
+                    type: ruleName
+                });
+            }
+        });
+
+        setSyntaxErrors(errors);
+    }, [language]);
+
+    const fullSyntaxCheck = useCallback((code) => {
+        const currentRules = SYNTAX_RULES[language?.toLowerCase()]?.full;
+        if (!currentRules) return;
+
+        const errors = [];
+        const lines = code.split('\n');
+
+        lines.forEach((line, lineIndex) => {
+            Object.entries(currentRules).forEach(([ruleName, rule]) => {
+                const match = line.match(rule.pattern);
+                if (match) {
+                    if (rule.validate) {
+                        const error = rule.validate(match);
+                        if (error) {
+                            errors.push({
+                                line: lineIndex + 1,
+                                message: error,
+                                type: ruleName
+                            });
+                        }
+                    } else if (rule.message) {
+                        errors.push({
+                            line: lineIndex + 1,
+                            message: rule.message,
+                            type: ruleName
+                        });
+                    }
+                }
+            });
+        });
+
+        setSyntaxErrors(prev => [...prev, ...errors]);
+    }, [language]);
+
+    // Debounced kontroller
+    const debouncedQuickCheck = useMemo(
+        () => debounce(quickSyntaxCheck, QUICK_CHECK_DEBOUNCE),
+        [quickSyntaxCheck]
+    );
+
+    const debouncedFullCheck = useMemo(
+        () => debounce(fullSyntaxCheck, FULL_CHECK_DEBOUNCE),
+        [fullSyntaxCheck]
+    );
+
+    useEffect(() => {
+        return () => {
+            debouncedQuickCheck.cancel();
+            debouncedFullCheck.cancel();
+        };
+    }, [debouncedQuickCheck, debouncedFullCheck]);
 
     const handleChange = useCallback((e) => {
         const newValue = e.target.value;
-        setLocalValue(newValue);
         onChange(newValue);
+        debouncedQuickCheck(newValue);
+        debouncedFullCheck(newValue);
+        setLocalValue(newValue);
 
         const lines = newValue.split('\n');
         const cursorPosition = e.target.selectionStart;
@@ -278,6 +438,21 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
         );
     };
 
+    const ErrorMarker = ({ error }) => (
+        <div
+            className="absolute left-0 right-0 bg-red-500/10"
+            style={{
+                top: `${(error.line + 1) * 3}rem`,
+                height: '1.5rem'
+            }}
+        >
+            <div className="absolute left-0 w-2 h-full bg-red-500" />
+            <div className="absolute left-8 top-1.5 text-xs text-red-500">
+                Line {error.line}, Column {error.column}: {error.message}
+            </div>
+        </div>
+    );
+
     return (
         <div className="w-full h-full rounded-lg overflow-hidden border relative font-mono">
             <div className="p-2 text-sm flex items-center gap-2 w-full border-b">
@@ -288,6 +463,29 @@ const CodeEditor = React.memo(({ language, value, onChange, onSave }) => {
             </div>
             <div className="w-full h-[1000px] flex">
                 {/* Editor bölümü */}
+                {syntaxErrors.map((error, index) => (
+                    <ErrorMarker key={index} error={error} />
+                ))}
+
+
+                {syntaxErrors.length > 0 && (
+                    <div className="fixed bottom-12 left-0 right-0  border-t max-h-32 overflow-scroll">
+                        <div className="p-2 text-sm">
+                            <div className="font-bold mb-1">Syntax Issues ({syntaxErrors.length})</div>
+                            <div>
+                                {syntaxErrors.length > 0 ? (
+                                    syntaxErrors.map((error, index) => (
+                                        <div key={index}>
+                                            Line {error.line}, Column {error.column}: {error.message}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div>No syntax errors found!</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
                 <div className={`relative ${isMarkdown ? 'w-1/2 border-r' : 'w-full'} overflow-auto`}>
                     <textarea
                         ref={editorRef}
