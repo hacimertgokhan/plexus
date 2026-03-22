@@ -7,62 +7,86 @@
   ],
   "permissions": [
     "core:default",
-    "opener:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://**" }, { "url": "http://**" }]
+    },
     "dialog:default",
     "fs:default",
     {
       "identifier": "http:default",
-      "allow": [{ "url": "https://api.spotify.com" }]
+      "allow": [
+        { "url": "https://api.spotify.com/**" },
+        { "url": "https://accounts.spotify.com/**" },
+        { "url": "https://api.anthropic.com/**" },
+        { "url": "https://api.openai.com/**" },
+        { "url": "https://generativelanguage.googleapis.com/**" },
+        { "url": "http://localhost/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$USERPROFILE/**" },
+        { "path": "$DOCUMENTS/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "/Users/**" },
+        { "path": "/home/**" },
+        { "path": "/tmp/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$USERPROFILE/**" },
+        { "path": "$DOCUMENTS/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "/Users/**" },
+        { "path": "/home/**" }
+      ]
     },
     {
       "identifier": "fs:allow-exists",
       "allow": [
-        {
-          "path": "$APPDATA/*"
-        },
-        {
-          "path": "$USERPROFILE/*"
-        },
-        {
-          "path": "$HOME/*"
-        },
-        {
-          "path": "$DOCUMENTS/*"
-        }
+        { "path": "$HOME/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$USERPROFILE/**" },
+        { "path": "/Users/**" },
+        { "path": "/home/**" }
       ]
     },
     {
       "identifier": "fs:allow-create",
       "allow": [
-        {
-          "path": "$APPDATA/*"
-        },
-        {
-          "path": "$USERPROFILE/*"
-        },
-        {
-          "path": "$HOME/*"
-        },
-        {
-          "path": "$DOCUMENTS/*"
-        }
+        { "path": "$HOME/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$USERPROFILE/**" },
+        { "path": "/Users/**" },
+        { "path": "/home/**" }
       ]
     },
     {
       "identifier": "fs:allow-write-text-file",
       "allow": [
-        {
-          "path": "$APPDATA/*"
-        },
-        {
-          "path": "$USERPROFILE/*"
-        },
-        {
-          "path": "$HOME/*"
-        },
-        {
-          "path": "$DOCUMENTS/*"
-        }
+        { "path": "$HOME/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$USERPROFILE/**" },
+        { "path": "/Users/**" },
+        { "path": "/home/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$USERPROFILE/**" },
+        { "path": "/Users/**" },
+        { "path": "/home/**" }
       ]
     },
     "shell:default",
